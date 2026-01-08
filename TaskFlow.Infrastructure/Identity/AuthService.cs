@@ -3,39 +3,40 @@ using System.Collections.Generic;
 using System.Text;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.DTOs;
-using Microsoft.Identity.Client;
+using TaskFlow.Domain.Entities;
 using TaskFlow.Infrastructure.Repositories;
 namespace TaskFlow.Infrastructure.Identity
 {
 
-    public class AuthService(IPasswordHash passwordHash,JwtTokenGenerator jwtTokenGenerator,UserRepository user) : IAuthService
+    public class AuthService(IPasswordHash passwordHash, JwtTokenGenerator jwtTokenGenerator, IUserRepository userRepository) : IAuthService
     {
         public AuthResponseDto Register(RegisterDto request)
         {
             var hash = passwordHash.Hash(request.Password);
 
-            var user = new user(
+            var newUser = new User(
                 request.UserName,
                 hash,
                 request.OrganizationId
             );
             var token = jwtTokenGenerator.Generate(
-            user.Id,
-            user.OrganizationId,
-            "User"
+                newUser.Id,
+                newUser.OrganizationId,
+                "User"
             );
+            userRepository.Add(newUser);
 
             return new AuthResponseDto
             {
-                UserId = user.Id,
-                UserName = user.Name,
-                OrganizationId = user.OrganizationId,
+                UserId = newUser.Id,
+                UserName = newUser.UserName,
+                OrganizationId = newUser.OrganizationId,
                 AccessToken = token
             };
         }
         public AuthResponseDto Login(LoginDto request)
         {
-            var user = user.GetByUserName(
+            var user = userRepository.GetByUserName(
                request.UserName,
                request.OrganizationId);
 
@@ -44,19 +45,21 @@ namespace TaskFlow.Infrastructure.Identity
 
             if (!passwordHash.Verify(request.Password, user.PasswordHash))
                 throw new Exception("Invalid credentials");
+              
 
             var token = jwtTokenGenerator.Generate(
                 user.Id,
                 user.OrganizationId,
-                "User" 
+                "User"
             );
             return new AuthResponseDto
             {
                 UserId = user.Id,
-                UserName = user.Name,
+                UserName = user.UserName,
                 OrganizationId = user.OrganizationId,
                 AccessToken = token
             };
 
         }
     }
+}

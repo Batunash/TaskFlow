@@ -5,7 +5,7 @@ using TaskFlow.Application.Interfaces;
 
 namespace TaskFlow.Infrastructure.Identity
 {
-    internal class BcryptPasswordHasher : IPasswordHash
+    public class BcryptPasswordHasher : IPasswordHash
     {
         public string Hash(string password)
         {

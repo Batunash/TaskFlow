@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TaskFlow.Domain.Entities
 {
-    internal class Organization
+    public class Organization
     {
         public int Id { get; private set; }
         public string Name { get; private set; } = string.Empty;
