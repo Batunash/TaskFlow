@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Domain.Entities;
-using TaskFlow.Infrastructure.Identity;
+using TaskFlow.Application.Interfaces;
 
 namespace TaskFlow.Infrastructure.Persistence
 {
-   public class AppDbContext(DbContextOptions<AppDbContext> options,CurrentTenantService currentTenantService) : DbContext(options)
+   public class AppDbContext(DbContextOptions<AppDbContext> options,ICurrentTenantService currentTenantService) : DbContext(options)
     {
         public DbSet<Domain.Entities.User> Users => Set<Domain.Entities.User>();
         public DbSet<Domain.Entities.Organization> Organizations => Set<Domain.Entities.Organization>();
