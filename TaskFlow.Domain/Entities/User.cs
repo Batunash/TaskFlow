@@ -4,13 +4,13 @@ using System.Text;
 
 namespace TaskFlow.Domain.Entities
 {
-    public class User
+    public class User:IHasOrganization
     {
         public int Id { get; private set; }
         public string UserName { get; private set; } = string.Empty;
         public string PasswordHash { get; private set; } = string.Empty;
 
-        public int OrganizationId { get; private set; }
+        public int OrganizationId { get; set; }
 
         private User() { }
 

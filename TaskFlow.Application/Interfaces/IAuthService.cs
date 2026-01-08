@@ -9,5 +9,6 @@ namespace TaskFlow.Application.Interfaces
     {
         AuthResponseDto Register(RegisterDto request);
         AuthResponseDto Login(LoginDto request);
+        UserDto GetCurrentUser(int userId);
     }
 }

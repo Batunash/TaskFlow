@@ -19,12 +19,13 @@ namespace TaskFlow.Infrastructure.Identity
                 hash,
                 request.OrganizationId
             );
+            userRepository.Add(newUser);
             var token = jwtTokenGenerator.Generate(
                 newUser.Id,
                 newUser.OrganizationId,
                 "User"
             );
-            userRepository.Add(newUser);
+           
 
             return new AuthResponseDto
             {
@@ -60,6 +61,22 @@ namespace TaskFlow.Infrastructure.Identity
                 AccessToken = token
             };
 
+        }
+        public UserDto GetCurrentUser(int userId)
+        {
+            var user = userRepository.GetById(userId);
+
+            if (user == null)
+            {
+                throw new Exception("User not found"); 
+            }
+
+            return new UserDto
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                OrganizationId = user.OrganizationId
+            };
         }
     }
 }

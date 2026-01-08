@@ -1,6 +1,25 @@
 @TaskFlow.API_HostAddress = http://localhost:5221
 
-### Me Endpoint Testi
+POST {{TaskFlow.API_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "userName": "FinalTestUser",
+  "password": "Password123!",
+  "organizationId": 1
+}
+POST {{TaskFlow.API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "FinalTestUser",
+  "password": "Password123!",
+  "organizationId": 1
+}
+
+###
+
 GET {{TaskFlow.API_HostAddress}}/api/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwib3JnYW5pemF0aW9uSWQiOiIxIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiVXNlciIsImV4cCI6MTc2Nzg1NzU5NCwiaXNzIjoiVGFza0Zsb3ciLCJhdWQiOiJUYXNrRmxvd1VzZXJzIn0.DDM5StzRACdKp871e6CQ1VbDtVbDBUtW_nFa9u4L2kk
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4Iiwib3JnYW5pemF0aW9uSWQiOiIxIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiVXNlciIsImV4cCI6MTc3MTQ1NjU5OCwiaXNzIjoiVGFza0Zsb3ciLCJhdWQiOiJUYXNrRmxvd1VzZXJzIn0.cA6fI9JQmi4CildjDUyzfF2Gp1EMK1GQ4FNP6LbYpOU
 Accept: application/json
+

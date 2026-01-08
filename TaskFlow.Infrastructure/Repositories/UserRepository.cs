@@ -21,6 +21,10 @@ public class UserRepository(AppDbContext dbContext) : IUserRepository
         return dbContext.Users
             .FirstOrDefault(u => u.UserName == userName && u.OrganizationId == organizationId);
     }
+    public User? GetById(int id)
+    {
+        return dbContext.Users.Find(id);
+    }
 }
 
 

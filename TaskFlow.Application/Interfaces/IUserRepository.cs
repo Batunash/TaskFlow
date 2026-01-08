@@ -8,6 +8,7 @@ namespace TaskFlow.Application.Interfaces
     public interface IUserRepository
     {
         User? GetByUserName(string userName, int organizationId);
+        User? GetById(int id);
         void Add(User user);
     }
 }
