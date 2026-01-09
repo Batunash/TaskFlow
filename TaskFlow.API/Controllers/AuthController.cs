@@ -11,16 +11,16 @@ namespace TaskFlow.API.Controllers
     public class AuthController(IAuthService authService) : ControllerBase
     {
         [HttpPost("register")]
-        public IActionResult Register(RegisterDto request)
+        public async Task<IActionResult> Register(RegisterDto request)
         {
-            var result = authService.Register(request);
+            var result = await authService.RegisterAsync(request);  
             return Ok(result);
         }
 
         [HttpPost("login")]
-        public IActionResult Login(LoginDto request)
+        public async Task<IActionResult> Login(LoginDto request)
         {
-            var result = authService.Login(request);
+            var result = await authService.LoginAsync(request);
             return Ok(result);
         }
 

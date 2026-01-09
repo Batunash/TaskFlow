@@ -10,20 +10,21 @@ namespace TaskFlow.Infrastructure.Repositories;
 
 public class UserRepository(AppDbContext dbContext) : IUserRepository
 {
-    public void Add(User user)
+    public async Task AddAsync(User user)
     {
-        dbContext.Users.Add(user);
-        dbContext.SaveChanges();
+        await dbContext.Users.AddAsync(user);
+        await dbContext.SaveChangesAsync();
     }
 
-    public User? GetByUserName(string userName, int organizationId)
+    public async Task<User?> GetByUserNameAsync(string userName, int organizationId)
     {
-        return dbContext.Users
-            .FirstOrDefault(u => u.UserName == userName && u.OrganizationId == organizationId);
+        return await dbContext.Users
+            .FirstOrDefaultAsync(u => u.UserName == userName && u.OrganizationId == organizationId);
     }
-    public User? GetById(int id)
+
+    public async Task<User?> GetByIdAsync(int id)
     {
-        return dbContext.Users.Find(id);
+        return await dbContext.Users.FindAsync(id);
     }
 }
 

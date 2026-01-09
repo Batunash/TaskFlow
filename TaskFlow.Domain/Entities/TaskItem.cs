@@ -10,7 +10,8 @@ namespace TaskFlow.Domain.Entities
         public string Title { get; private set; } = string.Empty;
         public string Description { get; private set; } = string.Empty;
         public TaskItemStatus Status { get; private set; } = TaskItemStatus.ToDo;
-
+        public int? AssignedUserId { get; private set; }
+        public bool IsDeleted { get; private set; }
         public int ProjectId { get; set;}
         public int OrganizationId { get; set; }
         public Project? Project { get; private set; }
@@ -26,7 +27,34 @@ namespace TaskFlow.Domain.Entities
             OrganizationId = organizationId;
             Status = TaskItemStatus.ToDo;
         }
-        public void Start() => Status = TaskItemStatus.InProgress;
-        public void Complete() => Status = TaskItemStatus.Done;
+        public void Start()
+        {
+            if (Status != TaskItemStatus.ToDo)
+            {
+                throw new InvalidOperationException();
+            }
+            Status = TaskItemStatus.InProgress;
+        }
+        public void Complete()
+        {
+            if (Status != TaskItemStatus.InProgress)
+            {
+                throw new InvalidOperationException();
+            }
+            Status = TaskItemStatus.Done;
+        }
+        public void Delete()
+        {
+            IsDeleted = true;
+        }
+        public void Assign(int userId)
+        {
+            AssignedUserId = userId;
+        }
+        public void Update(string title, string description)
+        {
+            Title = title;
+            Description = description;
+        }
     }
 }

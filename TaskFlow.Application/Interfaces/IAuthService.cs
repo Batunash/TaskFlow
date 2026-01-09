@@ -7,8 +7,8 @@ namespace TaskFlow.Application.Interfaces
 {
     public interface IAuthService
     {
-        AuthResponseDto Register(RegisterDto request);
-        AuthResponseDto Login(LoginDto request);
-        UserDto GetCurrentUser(int userId);
+        Task<AuthResponseDto> RegisterAsync(RegisterDto request);
+        Task<AuthResponseDto> LoginAsync(LoginDto request);
+        Task<UserDto> GetCurrentUserAsync(int userId);
     }
 }

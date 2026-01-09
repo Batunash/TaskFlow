@@ -9,7 +9,7 @@ namespace TaskFlow.Domain.Entities
         public int Id { get; private set; }
         public string UserName { get; private set; } = string.Empty;
         public string PasswordHash { get; private set; } = string.Empty;
-
+        public ICollection<ProjectMember> ProjectMembership { get; private set; } = new List<ProjectMember>();
         public int OrganizationId { get; set; }
 
         private User() { }

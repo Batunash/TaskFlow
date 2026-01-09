@@ -7,8 +7,9 @@ namespace TaskFlow.Application.Interfaces
 {
     public interface IUserRepository
     {
-        User? GetByUserName(string userName, int organizationId);
-        User? GetById(int id);
-        void Add(User user);
+        Task<User?> GetByUserNameAsync(string userName, int organizationId);
+        Task<User?> GetByIdAsync(int id);
+
+        Task AddAsync(User user);
     }
 }

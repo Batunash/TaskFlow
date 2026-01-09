@@ -10,7 +10,7 @@ namespace TaskFlow.Infrastructure.Identity
 
     public class AuthService(IPasswordHash passwordHash, JwtTokenGenerator jwtTokenGenerator, IUserRepository userRepository) : IAuthService
     {
-        public AuthResponseDto Register(RegisterDto request)
+        public async Task<AuthResponseDto> RegisterAsync(RegisterDto request)
         {
             var hash = passwordHash.Hash(request.Password);
 
@@ -19,7 +19,7 @@ namespace TaskFlow.Infrastructure.Identity
                 hash,
                 request.OrganizationId
             );
-            userRepository.Add(newUser);
+           await userRepository.AddAsync(newUser);
             var token = jwtTokenGenerator.Generate(
                 newUser.Id,
                 newUser.OrganizationId,
@@ -35,9 +35,9 @@ namespace TaskFlow.Infrastructure.Identity
                 AccessToken = token
             };
         }
-        public AuthResponseDto Login(LoginDto request)
+        public async Task<AuthResponseDto> LoginAsync(LoginDto request)
         {
-            var user = userRepository.GetByUserName(
+            var user = await userRepository.GetByUserNameAsync(
                request.UserName,
                request.OrganizationId);
 
@@ -62,9 +62,9 @@ namespace TaskFlow.Infrastructure.Identity
             };
 
         }
-        public UserDto GetCurrentUser(int userId)
+        public async Task<UserDto> GetCurrentUserAsync(int userId)
         {
-            var user = userRepository.GetById(userId);
+            var user = await userRepository.GetByIdAsync(userId);
 
             if (user == null)
             {
