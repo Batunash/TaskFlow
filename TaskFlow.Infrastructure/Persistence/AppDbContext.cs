@@ -28,16 +28,12 @@ namespace TaskFlow.Infrastructure.Persistence
                  !currentTenantId.HasValue ||
                  u.OrganizationId == currentTenantId);
             modelBuilder.Entity<Project>().HasQueryFilter(p =>
-                (!currentTenantId.HasValue || p.OrganizationId == currentTenantId)
-                &&
-                (!currentUserId.HasValue || p.ProjectMembers.Any(pm => pm.UserId == currentUserId))
-            ); 
-            modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
-                (!currentTenantId.HasValue || t.OrganizationId == currentTenantId)
-                &&
-                (!currentUserId.HasValue || t.Project!.ProjectMembers.Any(pm => pm.UserId == currentUserId))
-            ); 
+                !currentTenantId.HasValue || p.OrganizationId == currentTenantId
+ );
 
+            modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
+                !currentTenantId.HasValue || t.OrganizationId == currentTenantId
+            );
             modelBuilder.Entity<ProjectMember>(entity =>
             {
                 entity.HasKey(pm => new { pm.ProjectId, pm.UserId });

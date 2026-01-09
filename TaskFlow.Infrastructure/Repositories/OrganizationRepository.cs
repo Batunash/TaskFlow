@@ -1,0 +1,35 @@
+﻿using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using TaskFlow.Application.Interfaces;
+using TaskFlow.Domain.Entities;
+using TaskFlow.Infrastructure.Persistence;
+
+namespace TaskFlow.Infrastructure.Repositories
+{
+    public class OrganizationRepository(AppDbContext db) : IOrganizationRepository
+    {
+        public async Task AddAsync(Organization organization)
+        {
+            await db.Organizations.AddAsync(organization);
+            await db.SaveChangesAsync();
+        }
+
+        public async Task<Organization?> GetByIdAsync(int id)
+        {
+            return await db.Organizations.FindAsync(id);
+        }
+
+        public async Task<Organization?> GetByUserIdAsync(int userId)
+        {
+           return await db.Organizations
+                .FirstOrDefaultAsync(o => o.OwnerId == userId);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await db.SaveChangesAsync();
+        }
+    }
+}

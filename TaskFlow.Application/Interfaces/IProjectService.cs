@@ -13,6 +13,6 @@ namespace TaskFlow.Application.Interfaces
         Task<IEnumerable<ResponseProjectDto>> GetAllProjectsAsync(int currentUserId);
         Task AddMemberAsync(AddProjectMemberDto dto, int currentUserId);
         Task RemoveMemberAsync(RemoveProjectMemberDto dto, int currentUserId);
-
+        Task GetProjectByIdAsync(int id);
     }
 }
