@@ -49,6 +49,24 @@ namespace TaskFlow.API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [HttpGet("task")]
+        public async Task<IActionResult> GetTasks([FromQuery] TaskFilterDto filter)
+        {
+            try
+            {
+                var userId = currentUserService.UserId!.Value;
+                var result = await taskService.GetByFilterAsync(filter, userId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
         [HttpPost("task/assign")]
         public async Task<IActionResult> AssignTask(AssignTaskDto request)
         {

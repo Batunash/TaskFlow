@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaskFlow.Application.Common;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
@@ -78,6 +79,35 @@ namespace TaskFlow.Application.Services
                     Title = t.Title,
                     Status = t.Status
                 }).ToList();
+        }
+        public async Task<PageResult<ResponseTaskDto>> GetByFilterAsync(TaskFilterDto filter, int currentUserId)
+        {
+            var organizationId = GetRequiredOrganizationId();
+            if (filter.projectId > 0)
+            {
+                var project = await projectRepository.GetByIdAsync(filter.projectId);
+                if (project == null)
+                    throw new Exception("Project not found");
+
+                EnsureSameTenant(project.OrganizationId, organizationId);
+
+                if (!project.IsMember(currentUserId))
+                    throw new UnauthorizedAccessException("You are not a member of this project");
+            }
+            var pagedEntities = await taskRepository.GetByFilterAsync(filter);
+            var dtos = pagedEntities.Items.Select(t => new ResponseTaskDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Status = t.Status
+            }).ToList();
+            return new PageResult<ResponseTaskDto>
+            {
+                Items = dtos,
+                TotalCount = pagedEntities.TotalCount,
+                PageCount = pagedEntities.PageCount,
+                PageSize = pagedEntities.PageSize
+            };
         }
 
         public async Task<ResponseTaskDto> UpdateAsync(UpdateTaskDto dto, int currentUserId)
