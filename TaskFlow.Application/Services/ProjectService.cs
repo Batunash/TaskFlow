@@ -94,28 +94,27 @@ namespace TaskFlow.Application.Services
                     Description = p.Description
                 });
         }
-        public async Task<ResponseProjectDto> GetByIdAsync(int projectId,int currentUserId)
+        public async Task<ResponseProjectDto> GetProjectByIdAsync(int projectId,int currentUserId)
         {
             var organizationId = GetRequiredOrganizationId();
 
-            var project = await projectRepository.GetByIdAsync(projectId);
-            if (project == null)
-            {
-                throw new Exception("Project not found");
-            }
+            var project = await projectRepository.GetByIdAsync(projectId)
+                ?? throw new Exception("Project not found");
+
             EnsureSameTenant(project.OrganizationId, organizationId);
 
             if (!project.IsMember(currentUserId))
-            {
                 throw new UnauthorizedAccessException();
-            }
+
             return new ResponseProjectDto
             {
                 Id = project.Id,
                 Name = project.Name,
                 Description = project.Description
             };
+
         }
+
         public async Task AddMemberAsync(AddProjectMemberDto dto,int currentUserId)
         {
             var organizationId = GetRequiredOrganizationId();

@@ -52,7 +52,7 @@ namespace TaskFlow.Infrastructure.Persistence
             });
             modelBuilder.Entity<Project>()
                 .HasMany(p => p.Tasks)
-                .WithOne()
+                .WithOne(t => t.Project)
                 .HasForeignKey(t => t.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
