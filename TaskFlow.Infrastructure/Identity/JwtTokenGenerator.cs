@@ -10,14 +10,17 @@ namespace TaskFlow.Infrastructure.Identity
 {
     public class JwtTokenGenerator(JwtSettings settings)
     {
-        public string Generate(int userId, int organizationId,string role)
+        public string Generate(int userId, int? organizationId,string role)
         {
-            var claims = new[]
+            var claims = new List <Claim>
             {
                  new Claim("userId", userId.ToString()),
-                 new Claim("organizationId", organizationId.ToString()),
                  new Claim(ClaimTypes.Role, role)
             };
+            if (organizationId.HasValue)
+            {
+                claims.Add(new Claim("organizationId", organizationId.Value.ToString()));
+            }
             var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(settings.Secret));
 

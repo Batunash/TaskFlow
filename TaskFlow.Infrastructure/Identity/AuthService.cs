@@ -17,12 +17,12 @@ namespace TaskFlow.Infrastructure.Identity
             var newUser = new User(
                 request.UserName,
                 hash,
-                request.OrganizationId
+                null
             );
            await userRepository.AddAsync(newUser);
             var token = jwtTokenGenerator.Generate(
                 newUser.Id,
-                newUser.OrganizationId,
+                null,
                 "User"
             );
            
@@ -31,28 +31,30 @@ namespace TaskFlow.Infrastructure.Identity
             {
                 UserId = newUser.Id,
                 UserName = newUser.UserName,
-                OrganizationId = newUser.OrganizationId,
+                OrganizationId = null,
                 AccessToken = token
             };
         }
-        public async Task<AuthResponseDto> LoginAsync(LoginDto request)
-        {
-            var user = await userRepository.GetByUserNameAsync(
-               request.UserName,
-               request.OrganizationId);
+       public async Task<AuthResponseDto> LoginAsync(LoginDto request) 
+        { 
+
+    
+            var user = await userRepository.GetByUserNameAsync(request.UserName);
 
             if (user == null)
+            {
                 throw new Exception("Invalid credentials");
-
+            }
             if (!passwordHash.Verify(request.Password, user.PasswordHash))
+            {
                 throw new Exception("Invalid credentials");
-              
-
+            }
             var token = jwtTokenGenerator.Generate(
                 user.Id,
-                user.OrganizationId,
-                "User"
+                user.OrganizationId, 
+                "User" 
             );
+
             return new AuthResponseDto
             {
                 UserId = user.Id,
@@ -60,7 +62,6 @@ namespace TaskFlow.Infrastructure.Identity
                 OrganizationId = user.OrganizationId,
                 AccessToken = token
             };
-
         }
         public async Task<UserDto> GetCurrentUserAsync(int userId)
         {

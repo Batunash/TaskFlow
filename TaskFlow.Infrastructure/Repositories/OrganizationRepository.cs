@@ -26,6 +26,12 @@ namespace TaskFlow.Infrastructure.Repositories
            return await db.Organizations
                 .FirstOrDefaultAsync(o => o.OwnerId == userId);
         }
+        public async Task<Organization?> GetByIdWithMembersAsync(int id)
+        {
+            return await db.Organizations
+                .Include(o => o.Members)
+                .FirstOrDefaultAsync(o => o.Id == id);
+        }
 
         public async Task SaveChangesAsync()
         {

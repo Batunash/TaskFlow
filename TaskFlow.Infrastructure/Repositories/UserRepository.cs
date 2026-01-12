@@ -16,10 +16,10 @@ public class UserRepository(AppDbContext dbContext) : IUserRepository
         await dbContext.SaveChangesAsync();
     }
 
-    public async Task<User?> GetByUserNameAsync(string userName, int organizationId)
+    public async Task<User?> GetByUserNameAsync(string userName)
     {
         return await dbContext.Users
-            .FirstOrDefaultAsync(u => u.UserName == userName && u.OrganizationId == organizationId);
+            .FirstOrDefaultAsync(u => u.UserName == userName);
     }
 
     public async Task<User?> GetByIdAsync(int id)

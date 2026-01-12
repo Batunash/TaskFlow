@@ -1,0 +1,512 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow Yönetim Paneli</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --bg: #f3f4f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Kart Tasarımları */
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Inputlar ve Butonlar */
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+            input:focus {
+                outline: 2px solid var(--primary);
+                border-color: transparent;
+            }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+            button:hover {
+                opacity: 0.9;
+            }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            color: #4b5563;
+        }
+
+        /* Grid Yapısı */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* Durum Mesajları */
+        .status-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            display: block;
+        }
+
+        .success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            display: block;
+        }
+
+        /* Task Item */
+        .task-item {
+            border-left: 5px solid #ddd;
+            padding: 15px;
+            background: #f9fafb;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+
+        .status-0 {
+            border-color: #f59e0b;
+        }
+        /* ToDo */
+        .status-1 {
+            border-color: #3b82f6;
+        }
+        /* InProgress */
+        .status-2 {
+            border-color: #22c55e;
+        }
+        /* Done */
+
+        /* Adım Göstergesi */
+        .step-wizard {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            color: #9ca3af;
+        }
+
+            .step-wizard .active {
+                color: var(--primary);
+                font-weight: bold;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="margin:0;">TaskFlow 🚀</h1>
+            <div id="user-info" class="hidden" style="text-align: right; font-size: 14px;">
+                <span id="welcome-msg"></span><br>
+                <a href="#" onclick="logout()" style="color: var(--danger); text-decoration: none;">Çıkış Yap</a>
+            </div>
+        </div>
+
+        <div id="step-auth" class="card">
+            <h2 style="text-align: center;">Giriş Yap veya Kayıt Ol</h2>
+            <div id="auth-msg" class="status-box"></div>
+
+            <div class="grid-2">
+                <div>
+                    <h3>Giriş</h3>
+                    <input type="text" id="login-user" placeholder="Kullanıcı Adı" value="TestUser">
+                    <input type="password" id="login-pass" placeholder="Şifre" value="Password123!">
+                    <input type="number" id="login-org" placeholder="Organizasyon ID" value="1">
+                    <button class="btn-primary" onclick="handleLogin()">Giriş Yap</button>
+                </div>
+                <div style="border-left: 1px solid #eee; padding-left: 20px;">
+                    <h3>Kayıt Ol</h3>
+                    <p style="font-size: 13px; color: #666;">Henüz hesabın yoksa buradan oluştur. Org ID otomatik olarak 1 seçilidir.</p>
+                    <input type="text" id="reg-user" placeholder="Yeni Kullanıcı Adı">
+                    <input type="password" id="reg-pass" placeholder="Şifre">
+                    <input type="number" id="reg-org" placeholder="Organizasyon ID" value="1" readonly style="background: #f3f4f6;">
+                    <button class="btn-success" onclick="handleRegister()">Kayıt Ol ve Giriş Yap</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-org" class="card hidden" style="border: 2px solid var(--danger);">
+            <h2 style="color: var(--danger);">⚠️ Organizasyon Eksik!</h2>
+            <p>Kullanıcınız <strong>Organizasyon ID: <span id="missing-org-id"></span></strong> ile kayıtlı ancak veritabanında böyle bir şirket bulunamadı.</p>
+            <p>Proje oluşturabilmek için lütfen önce şirketi oluşturun:</p>
+
+            <div style="background: #fef2f2; padding: 15px; border-radius: 8px;">
+                <input type="text" id="create-org-name" placeholder="Şirket Adı (Örn: ACME Yazılım)">
+                <button class="btn-danger" onclick="createOrganization()">Şirketi Oluştur ve Devam Et</button>
+            </div>
+        </div>
+
+        <div id="step-dashboard" class="hidden">
+            <div class="grid-2">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>📂 Projeler</h3>
+                        <button class="btn-primary" style="width: auto; padding: 5px 10px;" onclick="toggleProjectForm()">+ Yeni</button>
+                    </div>
+
+                    <div id="new-project-form" class="hidden" style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                        <input type="text" id="proj-name" placeholder="Proje Adı">
+                        <input type="text" id="proj-desc" placeholder="Açıklama">
+                        <button class="btn-success" onclick="createProject()">Kaydet</button>
+                    </div>
+
+                    <div id="project-list">Yükleniyor...</div>
+                </div>
+
+                <div class="card">
+                    <h3>📝 Görevler <span id="active-project-name" style="font-size: 0.7em; color: #666;">(Proje Seçilmedi)</span></h3>
+
+                    <div id="task-area" class="hidden">
+                        <div style="display:flex; gap: 5px;">
+                            <input type="text" id="task-title" placeholder="Yeni görev...">
+                            <button class="btn-primary" style="width: 80px;" onclick="createTask()">Ekle</button>
+                        </div>
+                        <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+                        <div id="task-list"></div>
+                    </div>
+                    <div id="no-project-msg" style="color: #999; text-align: center; padding: 20px;">
+                        Görevleri görmek için soldan bir proje seçin.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:5221/api";
+
+        // Global State
+        let state = {
+            token: localStorage.getItem("token"),
+            userId: localStorage.getItem("userId"),
+            orgId: localStorage.getItem("orgId"),
+            selectedProject: null
+        };
+
+        // Sayfa Yüklendiğinde
+        if (state.token) {
+            initApp();
+        }
+
+        // --- Auth İşlemleri ---
+        async function handleLogin() {
+            const payload = {
+                userName: document.getElementById("login-user").value,
+                password: document.getElementById("login-pass").value,
+                organizationId: parseInt(document.getElementById("login-org").value)
+            };
+            await performAuth("login", payload);
+        }
+
+        async function handleRegister() {
+            const payload = {
+                userName: document.getElementById("reg-user").value,
+                password: document.getElementById("reg-pass").value,
+                organizationId: parseInt(document.getElementById("reg-org").value)
+            };
+            await performAuth("register", payload);
+        }
+
+        async function performAuth(endpoint, payload) {
+            showMsg("İşlem yapılıyor...", "auth-msg");
+            try {
+                const res = await fetch(`${API_URL}/auth/${endpoint}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message || "İşlem başarısız");
+
+                // State'i kaydet
+                state.token = data.accessToken;
+                state.userId = data.userId;
+                state.orgId = data.organizationId;
+
+                localStorage.setItem("token", state.token);
+                localStorage.setItem("userId", state.userId);
+                localStorage.setItem("orgId", state.orgId);
+
+                initApp(); // Uygulamayı başlat
+            } catch (err) {
+                showMsg(err.message, "auth-msg", true);
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // --- Ana Akış Kontrolü ---
+        async function initApp() {
+            document.getElementById("step-auth").classList.add("hidden");
+            document.getElementById("user-info").classList.remove("hidden");
+            document.getElementById("welcome-msg").innerHTML = `Kullanıcı: <b>${state.userId}</b> | Org: <b>${state.orgId}</b>`;
+
+            // 1. Önce Organizasyonu Kontrol Et
+            try {
+                const res = await fetch(`${API_URL}/organization/current`, {
+                    headers: { "Authorization": `Bearer ${state.token}` }
+                });
+
+                if (res.status === 400 || res.status === 404 || res.status === 500) {
+                    // Organizasyon YOK! Oluşturma ekranını aç.
+                    document.getElementById("step-org").classList.remove("hidden");
+                    document.getElementById("missing-org-id").innerText = state.orgId;
+                } else if (res.ok) {
+                    // Organizasyon VAR. Dashboard'a geç.
+                    document.getElementById("step-org").classList.add("hidden");
+                    document.getElementById("step-dashboard").classList.remove("hidden");
+                    loadProjects();
+                } else {
+                    throw new Error("Bilinmeyen bir hata oluştu");
+                }
+            } catch (err) {
+                alert("Sistem kontrolü yapılamadı: " + err.message);
+            }
+        }
+
+        // --- Organizasyon Oluşturma ---
+        async function createOrganization() {
+            const name = document.getElementById("create-org-name").value;
+            if (!name) return alert("Şirket adı giriniz");
+
+            try {
+                const res = await fetch(`${API_URL}/organization`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${state.token}`
+                    },
+                    body: JSON.stringify({ name: name })
+                });
+
+                if (res.ok) {
+                    alert("Şirket başarıyla oluşturuldu! Şimdi projeleri yönetebilirsiniz.");
+                    location.reload(); // Sayfayı yenile ki kontroller baştan yapılsın
+                } else {
+                    const err = await res.json();
+                    alert("Hata: " + (err.message || "Oluşturulamadı"));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- Proje İşlemleri ---
+        async function loadProjects() {
+            const list = document.getElementById("project-list");
+            try {
+                const res = await fetch(`${API_URL}/project`, {
+                    headers: { "Authorization": `Bearer ${state.token}` }
+                });
+                const projects = await res.json();
+
+                list.innerHTML = "";
+                if (projects.length === 0) list.innerHTML = "<p style='color:#666; text-align:center;'>Henüz proje yok.</p>";
+
+                projects.forEach(p => {
+                    const div = document.createElement("div");
+                    div.style.padding = "10px";
+                    div.style.borderBottom = "1px solid #eee";
+                    div.style.cursor = "pointer";
+                    div.style.display = "flex";
+                    div.style.justifyContent = "space-between";
+                    div.innerHTML = `<span><strong>${p.name}</strong></span> <span style='font-size:12px; color:#aaa;'>ID: ${p.id}</span>`;
+                    div.onclick = () => selectProject(p.id, p.name);
+                    list.appendChild(div);
+                });
+            } catch (err) {
+                list.innerHTML = "Projeler yüklenemedi.";
+            }
+        }
+
+        async function createProject() {
+            const name = document.getElementById("proj-name").value;
+            const desc = document.getElementById("proj-desc").value;
+
+            const res = await fetch(`${API_URL}/project`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${state.token}`
+                },
+                body: JSON.stringify({ name: name, description: desc })
+            });
+
+            if (res.ok) {
+                document.getElementById("new-project-form").classList.add("hidden");
+                document.getElementById("proj-name").value = "";
+                loadProjects();
+            } else {
+                const data = await res.json();
+                alert("Hata: " + data.message);
+            }
+        }
+
+        function toggleProjectForm() {
+            const form = document.getElementById("new-project-form");
+            form.classList.toggle("hidden");
+        }
+
+        function selectProject(id, name) {
+            state.selectedProject = id;
+            document.getElementById("active-project-name").innerText = `(${name})`;
+            document.getElementById("no-project-msg").classList.add("hidden");
+            document.getElementById("task-area").classList.remove("hidden");
+            loadTasks(id);
+        }
+
+        // --- Görev İşlemleri ---
+        async function loadTasks(projectId) {
+            const list = document.getElementById("task-list");
+            list.innerHTML = "<small>Yükleniyor...</small>";
+
+            try {
+                // API Tasarımı POST /api/project/{id}/tasks şeklinde
+                const res = await fetch(`${API_URL}/project/${projectId}/tasks`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${state.token}` }
+                });
+                const tasks = await res.json();
+
+                list.innerHTML = "";
+                if (tasks.length === 0) list.innerHTML = "<small>Görev bulunamadı.</small>";
+
+                tasks.forEach(t => {
+                    const statusText = ["Yapılacak", "Sürüyor", "Tamamlandı"];
+                    const div = document.createElement("div");
+                    div.className = `task-item status-${t.status}`;
+                    div.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong>${t.title}</strong>
+                            <span style="font-size:11px; padding:2px 6px; background:#e5e7eb; border-radius:4px;">${statusText[t.status]}</span>
+                        </div>
+                        <div style="margin-top:8px; display:flex; gap:5px;">
+                            ${t.status === 0 ? `<button class="btn-primary" style="margin:0; padding:5px; font-size:12px;" onclick="changeStatus(${t.id}, 1)">Başlat</button>` : ''}
+                            ${t.status === 1 ? `<button class="btn-success" style="margin:0; padding:5px; font-size:12px;" onclick="changeStatus(${t.id}, 2)">Bitir</button>` : ''}
+                            <button class="btn-danger" style="margin:0; padding:5px; font-size:12px; width:auto; margin-left:auto;" onclick="deleteTask(${t.id})">Sil</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function createTask() {
+            const title = document.getElementById("task-title").value;
+            if (!title) return;
+
+            await fetch(`${API_URL}/task`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${state.token}`
+                },
+                body: JSON.stringify({ projectId: state.selectedProject, title: title, description: "" })
+            });
+            document.getElementById("task-title").value = "";
+            loadTasks(state.selectedProject);
+        }
+
+        async function changeStatus(taskId, status) {
+            await fetch(`${API_URL}/task/status`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${state.token}`
+                },
+                body: JSON.stringify({ taskId: taskId, status: status })
+            });
+            loadTasks(state.selectedProject);
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm("Silinsin mi?")) return;
+            await fetch(`${API_URL}/task/${taskId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${state.token}` }
+            });
+            loadTasks(state.selectedProject);
+        }
+
+        // Yardımcı
+        function showMsg(msg, elId, isError = false) {
+            const el = document.getElementById(elId);
+            el.innerText = msg;
+            el.style.display = "block";
+            el.className = isError ? "status-box error" : "status-box success";
+        }
+    </script>
+
+</body>
+</html>

@@ -25,18 +25,17 @@ namespace TaskFlow.Application.Services
                
         }
 
-        public async Task<ResponseOrganizationDto> GetCurrentAsync(int currentUserId)
+        public async Task<ResponseOrganizationDto> GetCurrentAsync() 
         {
+            var currentUserId = currentUserService.UserId
+                ?? throw new UnauthorizedAccessException("User context not found");
             var organizationId = currentTenantService.OrganizationId
-                 ?? throw new UnauthorizedAccessException("Organization context not found");
-
-            var organization = await organizationRepository.GetByIdAsync(organizationId)
-                 ?? throw new Exception("Organization not found");
-
-            if (!organization.IsOwner(currentUserId) &&
-                !organization.Members.Any(m => m.UserId == currentUserId))
+                    ?? throw new UnauthorizedAccessException("Organization context not found");
+            var organization = await organizationRepository.GetByIdWithMembersAsync(organizationId)
+                    ?? throw new KeyNotFoundException("Organization not found"); 
+            if (!organization.IsOwner(currentUserId) &&!organization.Members.Any(m => m.UserId == currentUserId))
             {
-                throw new UnauthorizedAccessException();
+                throw new UnauthorizedAccessException("User is not a member of this organization.");
             }
 
             return new ResponseOrganizationDto

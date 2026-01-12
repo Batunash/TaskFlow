@@ -7,7 +7,7 @@ using TaskFlow.Domain.Entities;
 using TaskFlow.Infrastructure.Persistence;
 namespace TaskFlow.Infrastructure.Repositories
 {
-    internal class ProjectRepository(AppDbContext db) : IProjectRepository
+    public class ProjectRepository(AppDbContext db) : IProjectRepository
     {
         public async Task AddAsync(Project project)
         {
@@ -25,6 +25,7 @@ namespace TaskFlow.Infrastructure.Repositories
         {
             return await db.Projects
                .Include(p => p.Tasks)
+               .Include(p => p.ProjectMembers)
                .ToListAsync();
         }
 
@@ -32,6 +33,7 @@ namespace TaskFlow.Infrastructure.Repositories
         {
             return await db.Projects
                .Include(p => p.Tasks)
+               .Include(p => p.ProjectMembers)
                .FirstOrDefaultAsync(p => p.Id == id);
         }
         public async Task<bool> IsMemberAsync(int projectId, int userId)

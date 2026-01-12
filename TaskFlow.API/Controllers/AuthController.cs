@@ -37,7 +37,7 @@ namespace TaskFlow.API.Controllers
             var organizationId = User.FindFirst("organizationId")?.Value;
             var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
-            if (userId == null || organizationId == null)
+            if (userId == null)
                 return Unauthorized("Claim bulunamadı");
 
             return Ok(new

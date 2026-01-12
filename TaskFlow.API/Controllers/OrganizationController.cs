@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Domain.Enums;
+using TaskFlow.Infrastructure.Identity;
 
 
 namespace TaskFlow.API.Controllers
@@ -9,15 +11,26 @@ namespace TaskFlow.API.Controllers
     [Authorize]
     [Route("api/[controller]")]
     [ApiController]
-    public class OrganizationController(IOrganizationService organizationService,ICurrentUserService currentUserService) : ControllerBase
+    public class OrganizationController(IOrganizationService organizationService,ICurrentUserService currentUserService,JwtTokenGenerator jwtTokenGenerator) : ControllerBase
     {
         [HttpPost]
         public async Task<IActionResult> CreateOrganization(CreateOrganizationDto request)
         {
             try
             {
-                var result = await organizationService.CreateAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
+                var userId = currentUserService.UserId!.Value;
+                var result = await organizationService.CreateAsync(request, userId);
+                var newToken = jwtTokenGenerator.Generate(
+                    userId,
+                    result.Id, // Yeni Org ID
+                    OrganizationRole.Owner.ToString()
+                );
+                return Ok(new
+                {
+                    Organization = result,
+                    AccessToken = newToken,
+                    Message = "Organization created. Token updated."
+                });
             }
             catch (Exception ex)
             {
@@ -29,8 +42,16 @@ namespace TaskFlow.API.Controllers
         {
             try
             {
-                var result = await organizationService.GetCurrentAsync(currentUserService.UserId!.Value);
+                var result = await organizationService.GetCurrentAsync();
                 return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (Exception ex)
             {

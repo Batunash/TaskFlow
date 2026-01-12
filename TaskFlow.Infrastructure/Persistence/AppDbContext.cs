@@ -24,9 +24,6 @@ namespace TaskFlow.Infrastructure.Persistence
             base.OnModelCreating(modelBuilder);
             var currentTenantId = currentTenantService.OrganizationId;
             var currentUserId = currentUserService.UserId;
-            modelBuilder.Entity<User>().HasQueryFilter(u =>
-                 !currentTenantId.HasValue ||
-                 u.OrganizationId == currentTenantId);
             modelBuilder.Entity<Project>().HasQueryFilter(p =>
                 !currentTenantId.HasValue || p.OrganizationId == currentTenantId
  );

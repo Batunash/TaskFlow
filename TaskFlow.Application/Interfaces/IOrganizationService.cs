@@ -9,7 +9,7 @@ namespace TaskFlow.Application.Interfaces
     {
         Task<ResponseOrganizationDto> CreateAsync(CreateOrganizationDto dto, int currentUserId);
 
-        Task<ResponseOrganizationDto> GetCurrentAsync(int currentUserId);
+        Task<ResponseOrganizationDto> GetCurrentAsync();
 
         Task InviteAsync(InviteUserDto dto, int currentUserId);
     }

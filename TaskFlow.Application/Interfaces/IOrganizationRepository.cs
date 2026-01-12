@@ -10,6 +10,7 @@ namespace TaskFlow.Application.Interfaces
         Task AddAsync(Organization organization);
         Task<Organization?> GetByIdAsync(int id);
         Task<Organization?> GetByUserIdAsync(int userId);
+        Task<Organization?> GetByIdWithMembersAsync(int id);
         Task SaveChangesAsync();
     }
 }

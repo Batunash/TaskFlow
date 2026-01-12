@@ -8,6 +8,6 @@ namespace TaskFlow.Application.DTOs
     {
         public int Id { get; init; }
         public string UserName { get; init; } = string.Empty;
-        public int OrganizationId { get; init; }
+        public int? OrganizationId { get; init; }
     }
 }
