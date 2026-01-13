@@ -21,9 +21,7 @@ namespace TaskFlow.Application.Services
                 organizationId
             );
             project.AddMember(currentUserId, Role.Admin);
-
             await projectRepository.AddAsync(project);
-
             return new ResponseProjectDto
             {
                 Id = project.Id,

@@ -18,6 +18,9 @@ namespace TaskFlow.Infrastructure.Persistence
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<TaskItem> TaskItems => Set<TaskItem>();
         public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+        public DbSet<Workflow> Workflows => Set<Workflow>();
+        public DbSet<WorkflowState> WorkflowStates => Set<WorkflowState>();
+        public DbSet<WorkflowTransition> WorkflowTransitions => Set<WorkflowTransition>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
