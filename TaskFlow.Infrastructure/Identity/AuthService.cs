@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.DTOs;
+using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
+using TaskFlow.Domain.Exceptions;
 using TaskFlow.Infrastructure.Repositories;
 namespace TaskFlow.Infrastructure.Identity
 {
@@ -12,6 +13,11 @@ namespace TaskFlow.Infrastructure.Identity
     {
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto request)
         {
+            var existingUser = await userRepository.GetByUserNameAsync(request.UserName);
+            if (existingUser != null)
+            {
+                throw new BusinessRuleException($"Username '{request.UserName}' is already taken.");
+            }
             var hash = passwordHash.Hash(request.Password);
 
             var newUser = new User(
@@ -43,11 +49,11 @@ namespace TaskFlow.Infrastructure.Identity
 
             if (user == null)
             {
-                throw new Exception("Invalid credentials");
+                throw new BusinessRuleException("Invalid credentials");
             }
             if (!passwordHash.Verify(request.Password, user.PasswordHash))
             {
-                throw new Exception("Invalid credentials");
+                throw new BusinessRuleException("Invalid credentials");
             }
             var token = jwtTokenGenerator.Generate(
                 user.Id,
@@ -69,9 +75,8 @@ namespace TaskFlow.Infrastructure.Identity
 
             if (user == null)
             {
-                throw new Exception("User not found"); 
+               throw new NotFoundException($"User with ID {userId} not found");
             }
-
             return new UserDto
             {
                 Id = user.Id,

@@ -6,6 +6,7 @@ using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Application.Services
 {
@@ -38,7 +39,7 @@ namespace TaskFlow.Application.Services
             var project = await projectRepository.GetByIdAsync(dto.Id);
             if (project == null)
             {
-                throw new Exception("Project not found");
+                throw new NotFoundException($"Project with ID {dto.Id} not found.");
             }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
@@ -65,7 +66,7 @@ namespace TaskFlow.Application.Services
             var project = await projectRepository.GetByIdAsync(projectId);
             if (project == null)
             {
-                throw new Exception("Project not found");
+                throw new NotFoundException($"Project with ID {projectId} not found.");
             }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
@@ -97,12 +98,14 @@ namespace TaskFlow.Application.Services
             var organizationId = GetRequiredOrganizationId();
 
             var project = await projectRepository.GetByIdAsync(projectId)
-                ?? throw new Exception("Project not found");
+                ?? throw new NotFoundException($"Project with ID {projectId} not found.");
 
             EnsureSameTenant(project.OrganizationId, organizationId);
 
             if (!project.IsMember(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
+            }
 
             return new ResponseProjectDto
             {
@@ -120,7 +123,7 @@ namespace TaskFlow.Application.Services
             var project = await projectRepository.GetByIdAsync(dto.ProjectId);
             if (project == null)
             {
-                throw new Exception("Project not found");
+                throw new NotFoundException($"Project with ID {dto.ProjectId} not found.");
             }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
@@ -139,7 +142,7 @@ namespace TaskFlow.Application.Services
             var project = await projectRepository.GetByIdAsync(dto.ProjectId);
             if (project == null)
             {
-                throw new Exception("Project not found");
+                throw new NotFoundException($"Project with ID {dto.ProjectId} not found.");
             }
 
             EnsureSameTenant(project.OrganizationId, organizationId);

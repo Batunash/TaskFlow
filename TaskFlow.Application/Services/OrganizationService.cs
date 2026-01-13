@@ -5,6 +5,7 @@ using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Application.Services
 {
@@ -32,7 +33,7 @@ namespace TaskFlow.Application.Services
             var organizationId = currentTenantService.OrganizationId
                     ?? throw new UnauthorizedAccessException("Organization context not found");
             var organization = await organizationRepository.GetByIdWithMembersAsync(organizationId)
-                    ?? throw new KeyNotFoundException("Organization not found"); 
+                    ?? throw new NotFoundException($"Organization with ID {organizationId} not found.");
             if (!organization.IsOwner(currentUserId) &&!organization.Members.Any(m => m.UserId == currentUserId))
             {
                 throw new UnauthorizedAccessException("User is not a member of this organization.");
@@ -52,10 +53,12 @@ namespace TaskFlow.Application.Services
                 ?? throw new UnauthorizedAccessException("Organization context not found");
 
             var organization = await organizationRepository.GetByIdAsync(organizationId)
-                ?? throw new Exception("Organization not found");
+                ?? throw new NotFoundException($"Organization with ID {organizationId} not found.");
 
             if (!organization.IsOwner(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
+            }
 
             organization.AddMember(dto.UserId,OrganizationRole.Member);
 

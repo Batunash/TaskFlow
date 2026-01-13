@@ -31,15 +31,17 @@ namespace TaskFlow.API.Controllers
             var isAuth = User.Identity?.IsAuthenticated;
 
             if (isAuth != true)
+            {
                 return Unauthorized("Token authenticate edilmedi");
-
+            }
             var userId = User.FindFirst("userId")?.Value;
             var organizationId = User.FindFirst("organizationId")?.Value;
             var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
             if (userId == null)
+            {
                 return Unauthorized("Claim bulunamadı");
-
+            }
             return Ok(new
             {
                 UserId = userId,

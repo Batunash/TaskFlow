@@ -12,105 +12,47 @@ namespace TaskFlow.API.Controllers
         [HttpPost("task")]
         public async Task<IActionResult> CreateTask(CreateTaskDto request)
         {
-            try
-            {
-                var result = await taskService.CreateAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await taskService.CreateAsync(request, currentUserService.UserId!.Value);
+            return Ok(result);
 
         }
         [HttpPut("task")]
         public async Task<IActionResult> UpdateTask(UpdateTaskDto request)
         {
-            try
-            {
-                var result = await taskService.UpdateAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await taskService.UpdateAsync(request, currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpGet("project/{projectId}/tasks")]
         public async Task<IActionResult> GetTasksByProjectId(int projectId)
         {
-            try
-            {
-                var result = await taskService.GetByProjectIdAsync(projectId, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await taskService.GetByProjectIdAsync(projectId, currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpGet("task")]
         public async Task<IActionResult> GetTasks([FromQuery] TaskFilterDto filter)
         {
-            try
-            {
-                var userId = currentUserService.UserId!.Value;
-                var result = await taskService.GetByFilterAsync(filter, userId);
-                return Ok(result);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var userId = currentUserService.UserId!.Value;
+            var result = await taskService.GetByFilterAsync(filter, userId);
+            return Ok(result);
         }
         [HttpPost("task/assign")]
         public async Task<IActionResult> AssignTask(AssignTaskDto request)
         {
-            try
-            {
-                var result = await taskService.AssignAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await taskService.AssignAsync(request, currentUserService.UserId!.Value);
+            return Ok(result);
 
         }
         [HttpDelete("task/{taskId}")]
         public async Task<IActionResult> DeleteTask(int taskId)
         {
-            try
-            {
-                await taskService.DeleteAsync(taskId, currentUserService.UserId!.Value);
-                return Ok(new { message = "Task deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await taskService.DeleteAsync(taskId, currentUserService.UserId!.Value);
+            return Ok(new { message = "Task deleted successfully" });
         }
         [HttpPost("task/status")]
         public async Task<IActionResult> ChangeTaskStatus(ChangeTaskStatusDto request)
         {
-            try
-            {
-                await taskService.ChangeStatusAsync(request, currentUserService.UserId!.Value);
-                return Ok(new { message = "Task state changed successfully" });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-
+            await taskService.ChangeStatusAsync(request, currentUserService.UserId!.Value);
+            return Ok(new { message = "Task state changed successfully" });
         }
     }
 }

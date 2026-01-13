@@ -4,6 +4,7 @@ using System.Text;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
+using TaskFlow.Domain.Exceptions;
 namespace TaskFlow.Application.Services
 {
     public class WorkflowService(IWorkflowRepository workflowRepository) : IWorkflowService
@@ -25,7 +26,7 @@ namespace TaskFlow.Application.Services
         {
             var workflow= await workflowRepository
                 .GetByProjectIdAsync(projectId)
-                ?? throw new InvalidOperationException("Workflow not found");
+                ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
             return new WorkflowDto
             {
                 Id = workflow.Id,
@@ -56,7 +57,7 @@ namespace TaskFlow.Application.Services
             
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
-                ?? throw new InvalidOperationException("Workflow not found");
+                ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
             var state = new WorkflowState(
                 workflow.Id,
                 stateDto.Name,
@@ -81,7 +82,7 @@ namespace TaskFlow.Application.Services
         {
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
-                ?? throw new InvalidOperationException("Workflow not found");
+                ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
 
             var transition = new WorkflowTransition(
                 workflow.Id,                      
@@ -104,12 +105,11 @@ namespace TaskFlow.Application.Services
         {
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
-                ?? throw new InvalidOperationException("Workflow not found");
+                ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
             var state = workflow.States
                 .FirstOrDefault(s => s.Id == stateId)
-                ?? throw new InvalidOperationException("State not found");
-
-            workflow.RemoveState(state);
+                ?? throw new BusinessRuleException("State has active transitions and cannot be removed.");
+        workflow.RemoveState(state);
 
             await workflowRepository.UpdateAsync(workflow);
 
@@ -119,10 +119,10 @@ namespace TaskFlow.Application.Services
         {
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
-                ?? throw new InvalidOperationException("Workflow not found");
+                ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
             var transition = workflow.Transitions
                 .FirstOrDefault(t => t.Id == transitionId)
-                ?? throw new InvalidOperationException("Transition not found");
+                ?? throw new NotFoundException($"Transition with ID {transitionId} not found.");
             workflow.RemoveTransition(transition);
             await workflowRepository.UpdateAsync(workflow);
         }

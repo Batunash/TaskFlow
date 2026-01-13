@@ -16,60 +16,31 @@ namespace TaskFlow.API.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateOrganization(CreateOrganizationDto request)
         {
-            try
+            var userId = currentUserService.UserId!.Value;
+            var result = await organizationService.CreateAsync(request, userId);
+            var newToken = jwtTokenGenerator.Generate(
+                userId,
+                result.Id,
+                OrganizationRole.Owner.ToString()
+            );
+            return Ok(new
             {
-                var userId = currentUserService.UserId!.Value;
-                var result = await organizationService.CreateAsync(request, userId);
-                var newToken = jwtTokenGenerator.Generate(
-                    userId,
-                    result.Id, // Yeni Org ID
-                    OrganizationRole.Owner.ToString()
-                );
-                return Ok(new
-                {
-                    Organization = result,
-                    AccessToken = newToken,
-                    Message = "Organization created. Token updated."
-                });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+                Organization = result,
+                AccessToken = newToken,
+                Message = "Organization created. Token updated."
+            });
         }
         [HttpGet("current")]
         public async Task<IActionResult> GetCurrentOrganization()
         {
-            try
-            {
-                var result = await organizationService.GetCurrentAsync();
-                return Ok(result);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await organizationService.GetCurrentAsync();
+            return Ok(result);
         }
         [HttpPost("invite")]
         public async Task<IActionResult> InviteUser(InviteUserDto request)
         {
-            try
-            {
-                await organizationService.InviteAsync(request, currentUserService.UserId!.Value);
-                return Ok(new { message = "User invited successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await organizationService.InviteAsync(request, currentUserService.UserId!.Value);
+            return Ok(new { message = "User invited successfully" });
         }
 
     }

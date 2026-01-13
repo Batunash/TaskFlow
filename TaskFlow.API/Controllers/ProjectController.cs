@@ -15,93 +15,44 @@ namespace TaskFlow.API.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateProject(CreateProjectDto request)
         {
-            try
-            {
-                var result = await projectService.CreateProjectAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await projectService.CreateProjectAsync(request, currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpGet]
         public async Task<IActionResult> GetAllProjects()
         {
-            try
-            {
-                var result = await projectService.GetAllProjectsAsync(currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await projectService.GetAllProjectsAsync(currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProjectById(int id)
         {
-            try
-            {
-                var result = await projectService.GetProjectByIdAsync(id, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await projectService.GetProjectByIdAsync(id, currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProject(UpdateProjectDto request)
         {
-            try
-            {
-                var result = await projectService.UpdateProjectAsync(request, currentUserService.UserId!.Value);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var result = await projectService.UpdateProjectAsync(request, currentUserService.UserId!.Value);
+            return Ok(result);
         }
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProject(int id)
         {
-            try
-            {
-                await projectService.DeleteProjectAsync(id, currentUserService.UserId!.Value);
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await projectService.DeleteProjectAsync(id, currentUserService.UserId!.Value);
+            return NoContent();
         }
         [HttpPost("{projectId}/members")]
         public async Task<IActionResult> AddMember(AddProjectMemberDto request)
         {
-            try
-            {
-                await projectService.AddMemberAsync(request, currentUserService.UserId!.Value);
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await projectService.AddMemberAsync(request, currentUserService.UserId!.Value);
+            return NoContent();
         }
         [HttpPost("{projectId}/members/{userId}")]
         public async Task<IActionResult> RemoveMember(RemoveProjectMemberDto request)
         {
-            try
-            {
-                await projectService.RemoveMemberAsync(request, currentUserService.UserId!.Value);
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await projectService.RemoveMemberAsync(request, currentUserService.UserId!.Value);
+            return NoContent();
         }
 
     }

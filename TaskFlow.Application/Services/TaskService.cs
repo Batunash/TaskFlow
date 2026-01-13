@@ -10,6 +10,7 @@ using TaskFlow.Application.Events;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Application.Services
 {
@@ -24,18 +25,18 @@ namespace TaskFlow.Application.Services
             var project = await projectRepository.GetByIdAsync(request.ProjectId);
             if (project == null)
             {
-                throw new Exception("Project not found");
+                throw new NotFoundException($"Project with ID {request.ProjectId} not found.");
 
             }
             var workflow = await workflowRepository.GetByProjectIdAsync(request.ProjectId);
             if (workflow == null)
             {
-                throw new Exception("Project does not have a workflow defined.");
+                throw new BusinessRuleException("Project workflow not defined.");
             }
             var initialState = workflow.States.FirstOrDefault(s => s.IsInitial);
             if (initialState == null)
             {
-                throw new Exception("Workflow does not have an initial state.");
+                throw new BusinessRuleException("Workflow has no initial state.");
             }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
@@ -62,14 +63,17 @@ namespace TaskFlow.Application.Services
 
             var task = await taskRepository.GetByIdAsync(taskId);
             if (task == null || task.IsDeleted)
-                throw new Exception("Task not found");
+            {
+                throw new NotFoundException($"Task with ID {taskId} not found.");
+            }
 
             EnsureSameTenant(task.OrganizationId, organizationId);
 
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
-            if (!project.IsAdmin(currentUserId))
+            if (project != null && !project.IsAdmin(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
-
+            }
             task.Delete();
 
             await taskRepository.SaveChangesAsync();
@@ -80,13 +84,15 @@ namespace TaskFlow.Application.Services
 
             var project = await projectRepository.GetByIdAsync(projectId);
             if (project == null)
-                throw new Exception("Project not found");
-
+            {
+                throw new NotFoundException($"Project with ID {projectId} not found.");
+            }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
             if (!project.IsMember(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
-
+            }
             var tasks = await taskRepository.GetByProjectIdAsync(projectId);
 
             return tasks
@@ -106,12 +112,15 @@ namespace TaskFlow.Application.Services
             {
                 var project = await projectRepository.GetByIdAsync(filter.projectId);
                 if (project == null)
-                    throw new Exception("Project not found");
-
+                {
+                    throw new NotFoundException($"Project with ID {filter.projectId} not found.");
+                }
                 EnsureSameTenant(project.OrganizationId, organizationId);
 
                 if (!project.IsMember(currentUserId))
+                {
                     throw new UnauthorizedAccessException("You are not a member of this project");
+                }
             }
             var pagedEntities = await taskRepository.GetByFilterAsync(filter);
             var dtos = pagedEntities.Items.Select(t => new ResponseTaskDto
@@ -136,14 +145,16 @@ namespace TaskFlow.Application.Services
 
             var task = await taskRepository.GetByIdAsync(dto.Id);
             if (task == null || task.IsDeleted)
-                throw new Exception("Task not found");
-
+            {
+                throw new NotFoundException($"Task with ID {dto.Id} not found.");
+            }
             EnsureSameTenant(task.OrganizationId, organizationId);
 
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
-            if (!project.IsMember(currentUserId))
+            if (project != null && !project.IsMember(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
-
+            }
             task.Update(dto.Title, dto.Description);
 
             await taskRepository.SaveChangesAsync();
@@ -162,17 +173,20 @@ namespace TaskFlow.Application.Services
 
             var task = await taskRepository.GetByIdAsync(dto.TaskId);
             if (task == null || task.IsDeleted)
-                throw new Exception("Task not found");
-
+            {
+                throw new NotFoundException($"Task with ID {dto.TaskId} not found.");
+            }
             EnsureSameTenant(task.OrganizationId, organizationId);
 
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
-            if (!project.IsAdmin(currentUserId))
+            if (project != null && !project.IsAdmin(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
-
-            if (!project.IsMember(dto.UserId))
-                throw new Exception("User is not project member");
-
+            }
+            if (project != null && !project.IsMember(dto.UserId))
+            {
+                throw new BusinessRuleException("User is not a member of this project.");
+            }
             task.Assign(dto.UserId);
 
             await taskRepository.SaveChangesAsync();
@@ -190,18 +204,18 @@ namespace TaskFlow.Application.Services
             var task = await taskRepository.GetByIdAsync(dto.TaskId);
             if (task == null || task.IsDeleted)
             {
-                throw new Exception("Task not found");
+                throw new NotFoundException($"Task with ID {dto.TaskId} not found.");
             }
             var oldStateName = task.WorkflowState?.Name ?? "Unknown";
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
-            if (!project.IsAdmin(currentUserId))
+            if ((project != null && !project.IsAdmin(currentUserId)))
             {
                 throw new UnauthorizedAccessException();
             }
             var workflow = await workflowRepository.GetByProjectIdAsync(task.ProjectId);
             if (workflow == null) 
-            { 
-                throw new Exception("Workflow not found");
+            {
+                throw new BusinessRuleException("Workflow not found for this project.");
             }
             var isValidTransition = workflow.Transitions.Any(t =>
                 t.FromStateId == task.WorkflowStateId &&
@@ -209,7 +223,7 @@ namespace TaskFlow.Application.Services
 
             if (!isValidTransition)
             {
-                throw new Exception("Invalid state transition.");
+                throw new BusinessRuleException("Invalid state transition.");
             }
             var targetState = workflow.States.FirstOrDefault(s => s.Id == dto.TargetStateId);
             var newStateName = targetState?.Name ?? "Unknown";
@@ -236,7 +250,5 @@ namespace TaskFlow.Application.Services
                 );
             }
         }
-
-       
     }
 }
