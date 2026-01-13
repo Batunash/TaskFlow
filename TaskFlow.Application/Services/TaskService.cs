@@ -11,7 +11,7 @@ using TaskFlow.Domain.Enums;
 
 namespace TaskFlow.Application.Services
 {
-    public class TaskService(ITaskRepository taskRepository,IProjectRepository projectRepository,ICurrentTenantService currentTenantService) : ITaskService
+    public class TaskService(ITaskRepository taskRepository,IProjectRepository projectRepository,ICurrentTenantService currentTenantService,IWorkflowRepository workflowRepository) : ITaskService
     {
         public async Task<ResponseTaskDto> CreateAsync(CreateTaskDto request, int currentUserId)
         {
@@ -19,14 +19,28 @@ namespace TaskFlow.Application.Services
 
             var project = await projectRepository.GetByIdAsync(request.ProjectId);
             if (project == null)
+            {
                 throw new Exception("Project not found");
 
+            }
+            var workflow = await workflowRepository.GetByProjectIdAsync(request.ProjectId);
+            if (workflow == null)
+            {
+                throw new Exception("Project does not have a workflow defined.");
+            }
+            var initialState = workflow.States.FirstOrDefault(s => s.IsInitial);
+            if (initialState == null)
+            {
+                throw new Exception("Workflow does not have an initial state.");
+            }
             EnsureSameTenant(project.OrganizationId, organizationId);
 
             if (!project.IsMember(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
+            }
 
-            var task = project.CreateTask(request.Title);
+            var task = project.CreateTask(request.Title, initialState.Id);
 
             await taskRepository.AddAsync(task);
 
@@ -34,7 +48,7 @@ namespace TaskFlow.Application.Services
             {
                 Id = task.Id,
                 Title = task.Title,
-                Status = task.Status
+                StateName = initialState.Name
             };
         }
 
@@ -77,7 +91,8 @@ namespace TaskFlow.Application.Services
                 {
                     Id = t.Id,
                     Title = t.Title,
-                    Status = t.Status
+                    StateId = t.WorkflowStateId,
+                    StateName = t.WorkflowState?.Name ?? string.Empty
                 }).ToList();
         }
         public async Task<PageResult<ResponseTaskDto>> GetByFilterAsync(TaskFilterDto filter, int currentUserId)
@@ -99,7 +114,8 @@ namespace TaskFlow.Application.Services
             {
                 Id = t.Id,
                 Title = t.Title,
-                Status = t.Status
+                StateId = t.WorkflowStateId,
+                StateName = t.WorkflowState?.Name ?? string.Empty
             }).ToList();
             return new PageResult<ResponseTaskDto>
             {
@@ -132,7 +148,8 @@ namespace TaskFlow.Application.Services
             {
                 Id = task.Id,
                 Title = task.Title,
-                Status = task.Status
+                StateId = task.WorkflowStateId,
+                StateName = task.WorkflowState?.Name ?? string.Empty
             };
         }
         public async  Task<ResponseTaskDto> AssignAsync(AssignTaskDto dto, int currentUserId)
@@ -159,7 +176,8 @@ namespace TaskFlow.Application.Services
             {
                 Id = task.Id,
                 Title = task.Title,
-                Status = task.Status
+                StateId = task.WorkflowStateId,
+                StateName = task.WorkflowState?.Name ?? string.Empty
             };
 
         }
@@ -167,16 +185,28 @@ namespace TaskFlow.Application.Services
         {
             var task = await taskRepository.GetByIdAsync(dto.TaskId);
             if (task == null || task.IsDeleted)
+            {
                 throw new Exception("Task not found");
-
+            }
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
             if (!project.IsAdmin(currentUserId))
+            {
                 throw new UnauthorizedAccessException();
+            }
+            var workflow = await workflowRepository.GetByProjectIdAsync(task.ProjectId);
+            if (workflow == null)
+            {
+                throw new Exception("Workflow not found for this project");
+            }
+            var isValidTransition = workflow.Transitions.Any(t =>
+                t.FromStateId == task.WorkflowStateId &&
+                t.ToStateId == dto.TargetStateId);
 
-            if (dto.Status == TaskItemStatus.InProgress)
-                task.Start();
-            else if (dto.Status == TaskItemStatus.Done)
-                task.Complete();
+            if (!isValidTransition) 
+            {
+                throw new Exception("Invalid state transition. This move is not defined in the workflow.");
+            }
+            task.ChangeState(dto.TargetStateId);
 
             await taskRepository.SaveChangesAsync();
         }

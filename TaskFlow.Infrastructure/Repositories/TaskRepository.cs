@@ -21,12 +21,14 @@ namespace TaskFlow.Infrastructure.Repositories
         public async Task<TaskItem?> GetByIdAsync(int taskId)
         {
             return await db.TaskItems
+                .Include(t => t.WorkflowState)
                 .FirstOrDefaultAsync(t=> t.Id == taskId);
         }
 
         public async Task<IReadOnlyList<TaskItem>> GetByProjectIdAsync(int projectId)
         {
             return await db.TaskItems
+                .Include(t => t.WorkflowState)
                 .Where(t => t.ProjectId == projectId)
                 .ToListAsync();
         }
@@ -37,9 +39,9 @@ namespace TaskFlow.Infrastructure.Repositories
             {
                 query = query.Where(t => t.ProjectId == filter.projectId);
             }
-            if (filter.Status.HasValue)
+            if (filter.WorkflowStateId.HasValue)
             {
-                query = query.Where(t => t.Status == filter.Status.Value);
+                query = query.Where(t => t.WorkflowStateId == filter.WorkflowStateId.Value);
             }
             if (filter.AssignedUserId.HasValue)
             {

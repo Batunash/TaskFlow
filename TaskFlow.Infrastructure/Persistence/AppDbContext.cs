@@ -34,6 +34,13 @@ namespace TaskFlow.Infrastructure.Persistence
             modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
                 !currentTenantId.HasValue || t.OrganizationId == currentTenantId
             );
+            modelBuilder.Entity<TaskItem>(entity =>
+            {
+                entity.HasOne(t => t.WorkflowState)
+                      .WithMany()
+                      .HasForeignKey(t => t.WorkflowStateId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
             modelBuilder.Entity<ProjectMember>(entity =>
             {
                 entity.HasKey(pm => new { pm.ProjectId, pm.UserId });
@@ -55,8 +62,20 @@ namespace TaskFlow.Infrastructure.Persistence
                 .WithOne(t => t.Project)
                 .HasForeignKey(t => t.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<WorkflowTransition>(entity =>
+            {
+                entity.Property(e => e.AllowedRoles)
+                    .HasConversion(
+                        v => string.Join(",", v),
+                        v => v.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                    )
+                    .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyCollection<string>>(
+                        (c1, c2) => c1.SequenceEqual(c2),
+                        c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                        c => c.ToList()));
+            });
+        }
 
-            }
         public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
             foreach (var entry in ChangeTracker.Entries<IHasOrganization>())

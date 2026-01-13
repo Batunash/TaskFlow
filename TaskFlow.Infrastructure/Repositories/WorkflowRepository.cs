@@ -19,6 +19,8 @@ namespace TaskFlow.Infrastructure.Repositories
         public async Task<Workflow?> GetByProjectIdAsync(int projectId)
         {
            return await db.Workflows
+                .Include(w => w.States)      
+                .Include(w => w.Transitions)  
                 .FirstOrDefaultAsync(w => w.ProjectId == projectId);
             
         }

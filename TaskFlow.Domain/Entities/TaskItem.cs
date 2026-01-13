@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using TaskFlow.Domain.Enums;
 namespace TaskFlow.Domain.Entities
 {
     public class TaskItem : IHasProject,IHasOrganization
@@ -9,14 +8,15 @@ namespace TaskFlow.Domain.Entities
         public int Id { get; private set; }
         public string Title { get; private set; } = string.Empty;
         public string Description { get; private set; } = string.Empty;
-        public TaskItemStatus Status { get; private set; } = TaskItemStatus.ToDo;
+        public int WorkflowStateId { get; private set; }
+        public WorkflowState? WorkflowState { get; private set; }
         public int? AssignedUserId { get; private set; }
         public bool IsDeleted { get; private set; }
         public int ProjectId { get; set;}
         public int OrganizationId { get; set; }
         public Project? Project { get; private set; }
         private TaskItem() { }
-        internal TaskItem(string title, int projectId, int organizationId)
+        public TaskItem(string title, int projectId, int organizationId,int initialWorkflowStateId)
         {
             if (string.IsNullOrWhiteSpace(title))
             {
@@ -25,23 +25,11 @@ namespace TaskFlow.Domain.Entities
             Title = title;
             ProjectId = projectId;
             OrganizationId = organizationId;
-            Status = TaskItemStatus.ToDo;
+            WorkflowStateId = initialWorkflowStateId;
         }
-        public void Start()
+        public void ChangeState(int newStateId)
         {
-            if (Status != TaskItemStatus.ToDo)
-            {
-                throw new InvalidOperationException();
-            }
-            Status = TaskItemStatus.InProgress;
-        }
-        public void Complete()
-        {
-            if (Status != TaskItemStatus.InProgress)
-            {
-                throw new InvalidOperationException();
-            }
-            Status = TaskItemStatus.Done;
+            WorkflowStateId = newStateId;
         }
         public void Delete()
         {

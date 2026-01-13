@@ -8,7 +8,7 @@ namespace TaskFlow.Application.DTOs
     public class ChangeTaskStatusDto
     {
         public int TaskId { get; set; }
-        public TaskItemStatus Status { get; set; }
+        public int TargetStateId { get; set; }
     }
 
 }

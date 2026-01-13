@@ -30,9 +30,9 @@ namespace TaskFlow.Domain.Entities
             Description = description;
         }
 
-        public TaskItem CreateTask(string title)
+        public TaskItem CreateTask(string title, int initialWorkflowStateId)
         {
-            var task = new TaskItem(title, Id, OrganizationId);
+            var task = new TaskItem(title, Id, OrganizationId,initialWorkflowStateId);
             _tasks.Add(task);
             return task;
         }

@@ -36,7 +36,7 @@ namespace TaskFlow.API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
-        [HttpPost("project/{projectId}/tasks")]
+        [HttpGet("project/{projectId}/tasks")]
         public async Task<IActionResult> GetTasksByProjectId(int projectId)
         {
             try
@@ -100,7 +100,11 @@ namespace TaskFlow.API.Controllers
             try
             {
                 await taskService.ChangeStatusAsync(request, currentUserService.UserId!.Value);
-                return Ok(new { message = "Task status changed successfully" });
+                return Ok(new { message = "Task state changed successfully" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (Exception ex)
             {
