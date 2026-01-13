@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Application.Events;
 
 namespace TaskFlow.Infrastructure.Persistence
 {
@@ -21,7 +22,7 @@ namespace TaskFlow.Infrastructure.Persistence
         public DbSet<Workflow> Workflows => Set<Workflow>();
         public DbSet<WorkflowState> WorkflowStates => Set<WorkflowState>();
         public DbSet<WorkflowTransition> WorkflowTransitions => Set<WorkflowTransition>();
-
+        public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

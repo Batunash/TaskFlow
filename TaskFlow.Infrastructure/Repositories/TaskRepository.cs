@@ -34,7 +34,7 @@ namespace TaskFlow.Infrastructure.Repositories
         }
         public async Task<PageResult<TaskItem>> GetByFilterAsync(TaskFilterDto filter)
         {
-            var query = db.TaskItems.AsQueryable();
+            var query = db.TaskItems.Include(t => t.WorkflowState).AsQueryable();
             if (filter.projectId > 0)
             {
                 query = query.Where(t => t.ProjectId == filter.projectId);

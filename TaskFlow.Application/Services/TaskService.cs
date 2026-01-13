@@ -1,17 +1,21 @@
-﻿using System;
+﻿using MediatR;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaskFlow.Application.Common;
 using TaskFlow.Application.DTOs;
+using TaskFlow.Application.Events;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
 
 namespace TaskFlow.Application.Services
 {
-    public class TaskService(ITaskRepository taskRepository,IProjectRepository projectRepository,ICurrentTenantService currentTenantService,IWorkflowRepository workflowRepository) : ITaskService
+    public class TaskService(ITaskRepository taskRepository,IProjectRepository projectRepository,
+        ICurrentTenantService currentTenantService,IWorkflowRepository workflowRepository,
+        IPublisher publisher) : ITaskService
     {
         public async Task<ResponseTaskDto> CreateAsync(CreateTaskDto request, int currentUserId)
         {
@@ -188,29 +192,36 @@ namespace TaskFlow.Application.Services
             {
                 throw new Exception("Task not found");
             }
+            var oldStateName = task.WorkflowState?.Name ?? "Unknown";
             var project = await projectRepository.GetByIdAsync(task.ProjectId);
             if (!project.IsAdmin(currentUserId))
             {
                 throw new UnauthorizedAccessException();
             }
             var workflow = await workflowRepository.GetByProjectIdAsync(task.ProjectId);
-            if (workflow == null)
-            {
-                throw new Exception("Workflow not found for this project");
+            if (workflow == null) 
+            { 
+                throw new Exception("Workflow not found");
             }
             var isValidTransition = workflow.Transitions.Any(t =>
                 t.FromStateId == task.WorkflowStateId &&
                 t.ToStateId == dto.TargetStateId);
 
-            if (!isValidTransition) 
+            if (!isValidTransition)
             {
-                throw new Exception("Invalid state transition. This move is not defined in the workflow.");
+                throw new Exception("Invalid state transition.");
             }
+            var targetState = workflow.States.FirstOrDefault(s => s.Id == dto.TargetStateId);
+            var newStateName = targetState?.Name ?? "Unknown";
             task.ChangeState(dto.TargetStateId);
-
             await taskRepository.SaveChangesAsync();
+            await publisher.Publish(new TaskStatusChangedEvent(
+                task.Id,
+                oldStateName,
+                newStateName,
+                currentUserId
+            ));
         }
-
         private int GetRequiredOrganizationId()
         {
             return currentTenantService.OrganizationId
