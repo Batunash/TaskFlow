@@ -5,12 +5,16 @@ using TaskFlow.Domain.Enums;
 
 namespace TaskFlow.Domain.Entities
 {
-    public class Project : IHasOrganization
+    public class Project : IHasOrganization, IAuditableEntity
     {
         public int Id { get; private set; }
         public string Name { get; private set; } = string.Empty;
         public string Description { get; private set; } = string.Empty;
         public int OrganizationId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
+        public string? LastModifiedBy { get; set; }
         public Organization? Organization { get; private set; }
         private readonly List<TaskItem> _tasks = new();
         public IReadOnlyCollection<TaskItem> Tasks => _tasks.AsReadOnly();

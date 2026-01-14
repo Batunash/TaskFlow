@@ -10,8 +10,7 @@ using TaskFlow.Application.Events;
 namespace TaskFlow.Infrastructure.Persistence
 {
     public class AppDbContext(
-        DbContextOptions<AppDbContext> options,
-        ICurrentTenantService currentTenantService,
+        DbContextOptions<AppDbContext> options,ICurrentTenantService currentTenantService,
         ICurrentUserService currentUserService) : DbContext(options)
     {
         public DbSet<User> Users => Set<User>();
@@ -28,10 +27,10 @@ namespace TaskFlow.Infrastructure.Persistence
             base.OnModelCreating(modelBuilder);
             var currentTenantId = currentTenantService.OrganizationId;
             var currentUserId = currentUserService.UserId;
+            modelBuilder.Entity<TaskItem>().HasQueryFilter(x => !x.IsDeleted);
             modelBuilder.Entity<Project>().HasQueryFilter(p =>
                 !currentTenantId.HasValue || p.OrganizationId == currentTenantId
- );
-
+            );
             modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
                 !currentTenantId.HasValue || t.OrganizationId == currentTenantId
             );
@@ -79,6 +78,21 @@ namespace TaskFlow.Infrastructure.Persistence
 
         public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
+            var currentUserId = currentUserService.UserId?.ToString();
+            foreach (var entry in ChangeTracker.Entries<IAuditableEntity>())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        entry.Entity.CreatedAt = DateTime.UtcNow;
+                        entry.Entity.CreatedBy = currentUserId;
+                        break;
+                    case EntityState.Modified:
+                        entry.Entity.LastModifiedAt = DateTime.UtcNow;
+                        entry.Entity.LastModifiedBy = currentUserId;
+                        break;
+                }
+            }
             foreach (var entry in ChangeTracker.Entries<IHasOrganization>())
             {
                 if (entry.State == EntityState.Added && currentTenantService.OrganizationId.HasValue)
@@ -87,6 +101,16 @@ namespace TaskFlow.Infrastructure.Persistence
                     {
                         entry.Entity.OrganizationId = currentTenantService.OrganizationId.Value;
                     }
+                }
+            }
+            foreach (var entry in ChangeTracker.Entries<ISoftDelete>())
+            {
+                if (entry.State == EntityState.Deleted)
+                {
+                    entry.State = EntityState.Modified;
+                    entry.Entity.IsDeleted = true;
+                    entry.Entity.DeletedAt = DateTime.UtcNow;
+                    entry.Entity.DeletedBy = currentUserId;
                 }
             }
             return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);

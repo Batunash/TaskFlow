@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TaskFlow.Domain.Entities
 {
-    public class Workflow
+    public class Workflow : IAuditableEntity
     {
         public int Id { get; private set; }
         public int ProjectId { get;  set; }
@@ -13,6 +13,10 @@ namespace TaskFlow.Domain.Entities
         public IReadOnlyCollection<WorkflowState> States => _states;
 
         private readonly List<WorkflowTransition> _transitions = new();
+        public DateTime CreatedAt { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
+        public string? LastModifiedBy { get; set; }
         public IReadOnlyCollection<WorkflowTransition> Transitions => _transitions;
 
         private Workflow() { } 

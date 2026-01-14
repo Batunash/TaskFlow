@@ -4,7 +4,7 @@ using System.Text;
 using TaskFlow.Domain.Enums;
 namespace TaskFlow.Domain.Entities
 {
-    public class Organization
+    public class Organization : IAuditableEntity
     {
         public int Id { get; private set; }
         public string Name { get; private set; }
@@ -12,7 +12,11 @@ namespace TaskFlow.Domain.Entities
 
         private readonly List<OrganizationMember> _members = new();
         public IReadOnlyCollection<OrganizationMember> Members => _members;
-
+        
+        public DateTime CreatedAt { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
+        public string? LastModifiedBy { get; set; }
         private Organization() { }
 
         public Organization(string name,int ownerId)

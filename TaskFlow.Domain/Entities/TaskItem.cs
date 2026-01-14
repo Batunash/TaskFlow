@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 namespace TaskFlow.Domain.Entities
 {
-    public class TaskItem : IHasProject,IHasOrganization
+    public class TaskItem : IHasProject,IHasOrganization, IAuditableEntity,ISoftDelete
     {
         public int Id { get; private set; }
         public string Title { get; private set; } = string.Empty;
@@ -11,9 +11,16 @@ namespace TaskFlow.Domain.Entities
         public int WorkflowStateId { get; private set; }
         public WorkflowState? WorkflowState { get; private set; }
         public int? AssignedUserId { get; private set; }
-        public bool IsDeleted { get; private set; }
         public int ProjectId { get; set;}
         public int OrganizationId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? CreatedBy { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
+        public string? LastModifiedBy { get; set; }
+
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
+        public string? DeletedBy { get; set; }
         public Project? Project { get; private set; }
         private TaskItem() { }
         public TaskItem(string title, int projectId, int organizationId,int initialWorkflowStateId)
@@ -34,6 +41,7 @@ namespace TaskFlow.Domain.Entities
         public void Delete()
         {
             IsDeleted = true;
+            DeletedAt = DateTime.UtcNow;
         }
         public void Assign(int userId)
         {
