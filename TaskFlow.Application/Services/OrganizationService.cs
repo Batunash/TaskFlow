@@ -9,7 +9,7 @@ using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Application.Services
 {
-    public class OrganizationService(IOrganizationRepository organizationRepository, ICurrentTenantService currentTenantService,ICurrentUserService currentUserService) : IOrganizationService
+    public class OrganizationService(IOrganizationRepository organizationRepository, ICurrentTenantService currentTenantService,ICurrentUserService currentUserService,IUserRepository userRepository) : IOrganizationService
     {
         public async Task<ResponseOrganizationDto> CreateAsync(CreateOrganizationDto request, int currentUserId)
         {
@@ -17,7 +17,12 @@ namespace TaskFlow.Application.Services
                 name: request.Name,
                 ownerId: currentUserId
             );
-            await organizationRepository.AddAsync(organization);
+            var user = await userRepository.GetByIdAsync(currentUserId);
+            if (user != null) {
+                user.OrganizationId = organization.Id;
+                await organizationRepository.SaveChangesAsync();
+            }
+                await organizationRepository.AddAsync(organization);
             return new ResponseOrganizationDto
             {
                 Id = organization.Id,
