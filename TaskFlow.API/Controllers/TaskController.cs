@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 namespace TaskFlow.API.Controllers
@@ -7,6 +8,7 @@ namespace TaskFlow.API.Controllers
     [Authorize]
     [Route("api")]
     [ApiController]
+    [EnableRateLimiting("GeneralPolicy")]
     public class TaskController(ITaskService taskService, ICurrentUserService currentUserService) : ControllerBase
     {
         [HttpPost("task")]

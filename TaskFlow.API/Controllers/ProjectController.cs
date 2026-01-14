@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Infrastructure.Identity;
@@ -9,6 +10,7 @@ namespace TaskFlow.API.Controllers
     [Authorize]
     [Route("api/[controller]")]
     [ApiController]
+    [EnableRateLimiting("GeneralPolicy")]
     public class ProjectController(IProjectService projectService, ICurrentUserService currentUserService) : ControllerBase
     {
 

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Enums;
@@ -11,6 +12,7 @@ namespace TaskFlow.API.Controllers
     [Authorize]
     [Route("api/[controller]")]
     [ApiController]
+    [EnableRateLimiting("GeneralPolicy")]
     public class OrganizationController(IOrganizationService organizationService,ICurrentUserService currentUserService,JwtTokenGenerator jwtTokenGenerator) : ControllerBase
     {
         [HttpPost]

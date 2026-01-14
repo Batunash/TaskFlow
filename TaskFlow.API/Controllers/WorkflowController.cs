@@ -1,12 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TaskFlow.Application.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
 using TaskFlow.Application.DTOs;
+using TaskFlow.Application.Interfaces;
 namespace TaskFlow.API.Controllers
 {
     [Authorize]
     [Route("api/projects/{projectId:int}/workflow")]
     [ApiController]
+    [EnableRateLimiting("GeneralPolicy")]
     public class WorkflowController(IWorkflowService workflowService) : ControllerBase
     {
         [HttpPost]

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
@@ -8,6 +9,7 @@ namespace TaskFlow.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [EnableRateLimiting("AuthPolicy")]
     public class AuthController(IAuthService authService) : ControllerBase
     {
         [HttpPost("register")]
