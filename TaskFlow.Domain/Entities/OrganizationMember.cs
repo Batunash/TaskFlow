@@ -13,7 +13,7 @@ namespace TaskFlow.Domain.Entities
 
         private OrganizationMember() { }
 
-        internal OrganizationMember(int userId, OrganizationRole role)
+        public OrganizationMember(int userId, OrganizationRole role)
         {
             UserId = userId;
             Role = role;

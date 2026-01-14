@@ -27,6 +27,8 @@ namespace TaskFlow.Domain.Entities
         }
         public void AddState(WorkflowState state)
         {
+            if (state == null) throw new ArgumentNullException(nameof(state));
+
             if (_states.Any(s => s.Name == state.Name))
             {
                 throw new InvalidOperationException($"Workflow already contains a state named '{state.Name}'.");
@@ -39,10 +41,35 @@ namespace TaskFlow.Domain.Entities
         }
         public void AddTransition(WorkflowTransition transition)
         {
+            if (transition == null) throw new ArgumentNullException(nameof(transition));
+
+            var fromState = _states.FirstOrDefault(s => s.Id == transition.FromStateId);
+            var toState = _states.FirstOrDefault(s => s.Id == transition.ToStateId);
+
+            if (fromState == null || toState == null)
+            {
+                throw new InvalidOperationException("Transition states must exist in the workflow.");
+            }
+            if (fromState.IsFinal)
+            {
+                throw new InvalidOperationException("Cannot add outgoing transition from a Final state.");
+            }
+
+            bool exists = _transitions.Any(t =>
+                t.FromStateId == transition.FromStateId &&
+                t.ToStateId == transition.ToStateId);
+
+            if (exists)
+            {
+                throw new InvalidOperationException("A transition between these states already exists.");
+            }
+
             _transitions.Add(transition);
         }
         public void RemoveState(WorkflowState state)
         {
+            if (state == null) throw new ArgumentNullException(nameof(state));
+
             if (state.IsInitial)
             {
                 throw new InvalidOperationException("Initial state cannot be removed");
@@ -60,9 +87,13 @@ namespace TaskFlow.Domain.Entities
                 throw new InvalidOperationException("Transition not found");
             }
             var fromState = _states.First(s => s.Id == transition.FromStateId);
-            if (fromState.IsInitial &&_transitions.Count(t => t.FromStateId == fromState.Id) <= 1)
+            if (fromState != null && fromState.IsInitial)
             {
-                throw new InvalidOperationException("Initial state must have at least one outgoing transition");
+                var outgoingCount = _transitions.Count(t => t.FromStateId == fromState.Id);
+                if (outgoingCount <= 1)
+                {
+                    throw new InvalidOperationException("Initial state must have at least one outgoing transition");
+                }
             }
             _transitions.Remove(transition);
         }

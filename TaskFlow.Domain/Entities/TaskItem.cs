@@ -49,8 +49,13 @@ namespace TaskFlow.Domain.Entities
         }
         public void Update(string title, string description)
         {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                throw new ArgumentException("Title cannot be empty", nameof(title));
+            }
             Title = title;
             Description = description;
         }
+
     }
 }

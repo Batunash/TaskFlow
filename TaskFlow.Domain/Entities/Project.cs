@@ -24,12 +24,20 @@ namespace TaskFlow.Domain.Entities
 
         public Project(string name, string description,int organizationId)
         {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new ArgumentException("Project name cannot be empty.", nameof(name));
+            }
             Name = name;
             Description = description;
             OrganizationId = organizationId;
         }
         public void Update(string name, string description)
         {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new ArgumentException("Project name cannot be empty.", nameof(name));
+            }
             Name = name;
             Description = description;
         }
