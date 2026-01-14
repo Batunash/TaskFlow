@@ -41,6 +41,12 @@ namespace TaskFlow.Infrastructure.Persistence
                       .HasForeignKey(t => t.WorkflowStateId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
+            modelBuilder.Entity<Organization>()
+                .HasIndex(o => o.Name)
+                .IsUnique();
+            modelBuilder.Entity<Project>()
+                .HasIndex(p => new { p.OrganizationId, p.Name })
+                .IsUnique();
             modelBuilder.Entity<ProjectMember>(entity =>
             {
                 entity.HasKey(pm => new { pm.ProjectId, pm.UserId });

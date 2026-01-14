@@ -17,6 +17,11 @@ namespace TaskFlow.Application.Services
     {
         public async Task<ResponseOrganizationDto> CreateAsync(CreateOrganizationDto request, int currentUserId)
         {
+            var exists = await organizationRepository.ExistsByNameAsync(request.Name);
+            if (exists)
+            {
+                throw new BusinessRuleException($"Organization with name '{request.Name}' already exists.");
+            }
             await createOrgValidator.ValidateAndThrowAsync(request);
             var organization = new Organization(
                 name: request.Name,

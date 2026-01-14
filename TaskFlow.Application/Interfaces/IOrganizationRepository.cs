@@ -7,6 +7,7 @@ namespace TaskFlow.Application.Interfaces
 {
     public interface IOrganizationRepository
     {
+        Task<bool> ExistsByNameAsync(string name);
         Task AddAsync(Organization organization);
         Task<Organization?> GetByIdAsync(int id);
         Task<Organization?> GetByUserIdAsync(int userId);

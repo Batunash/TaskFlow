@@ -9,6 +9,18 @@ namespace TaskFlow.Infrastructure.Repositories
 {
     public class ProjectRepository(AppDbContext db) : IProjectRepository
     {
+       
+        public async Task<bool> ExistsByNameAsync(string name, int organizationId, int? excludeProjectId = null)
+        {
+            var query = db.Projects.AsQueryable();
+            query = query.Where(p => p.Name == name && p.OrganizationId == organizationId);
+            if (excludeProjectId.HasValue)
+            {
+                query = query.Where(p => p.Id != excludeProjectId.Value);
+            }
+
+            return await query.AnyAsync();
+        }
         public async Task AddAsync(Project project)
         {
             await db.Projects.AddAsync(project);

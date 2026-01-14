@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using MediatR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,11 @@ namespace TaskFlow.Application.Services
         {
             await createProjectValidator.ValidateAndThrowAsync(request);
             var organizationId = GetRequiredOrganizationId();
-
+            var exists = await projectRepository.ExistsByNameAsync(request.Name, organizationId);
+            if (exists)
+            {
+                throw new BusinessRuleException($"Project with name '{request.Name}' already exists in this organization.");
+            }
             var project = new Project(
                 request.Name,
                 request.Description,
@@ -40,7 +45,11 @@ namespace TaskFlow.Application.Services
         {
             await updateProjectValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
-
+            var exists = await projectRepository.ExistsByNameAsync(dto.Name, organizationId, dto.Id);
+            if (exists)
+            {
+                throw new BusinessRuleException($"Project with name '{dto.Name}' already exists in this organization.");
+            }
             var project = await projectRepository.GetByIdAsync(dto.Id);
             if (project == null)
             {

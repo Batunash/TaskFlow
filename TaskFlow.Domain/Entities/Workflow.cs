@@ -27,6 +27,14 @@ namespace TaskFlow.Domain.Entities
         }
         public void AddState(WorkflowState state)
         {
+            if (_states.Any(s => s.Name == state.Name))
+            {
+                throw new InvalidOperationException($"Workflow already contains a state named '{state.Name}'.");
+            }
+            if (state.IsInitial && _states.Any(s => s.IsInitial))
+            {
+                throw new InvalidOperationException("Workflow can only have one Initial state.");
+            }
             _states.Add(state);
         }
         public void AddTransition(WorkflowTransition transition)

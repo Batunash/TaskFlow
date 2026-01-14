@@ -10,6 +10,10 @@ namespace TaskFlow.Infrastructure.Repositories
 {
     public class OrganizationRepository(AppDbContext db) : IOrganizationRepository
     {
+        public async Task<bool> ExistsByNameAsync(string name)
+        {
+            return await db.Organizations.AnyAsync(o => o.Name == name);
+        }
         public async Task AddAsync(Organization organization)
         {
             await db.Organizations.AddAsync(organization);
