@@ -11,15 +11,19 @@ using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
 using TaskFlow.Domain.Exceptions;
+using FluentValidation;
 
 namespace TaskFlow.Application.Services
 {
     public class TaskService(ITaskRepository taskRepository,IProjectRepository projectRepository,
         ICurrentTenantService currentTenantService,IWorkflowRepository workflowRepository,
-        IPublisher publisher) : ITaskService
+        IPublisher publisher, IValidator<CreateTaskDto> createTaskValidator,
+        IValidator<UpdateTaskDto> updateTaskValidator,IValidator<AssignTaskDto> assignTaskValidator,
+        IValidator<ChangeTaskStatusDto> changeStatusValidator,IValidator<TaskFilterDto> filterValidator) : ITaskService
     {
         public async Task<ResponseTaskDto> CreateAsync(CreateTaskDto request, int currentUserId)
         {
+            await createTaskValidator.ValidateAndThrowAsync(request);
             var organizationId = GetRequiredOrganizationId();
 
             var project = await projectRepository.GetByIdAsync(request.ProjectId);
@@ -107,6 +111,7 @@ namespace TaskFlow.Application.Services
         }
         public async Task<PageResult<ResponseTaskDto>> GetByFilterAsync(TaskFilterDto filter, int currentUserId)
         {
+            await filterValidator.ValidateAndThrowAsync(filter);
             var organizationId = GetRequiredOrganizationId();
             if (filter.projectId > 0)
             {
@@ -141,6 +146,7 @@ namespace TaskFlow.Application.Services
 
         public async Task<ResponseTaskDto> UpdateAsync(UpdateTaskDto dto, int currentUserId)
         {
+            await updateTaskValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
 
             var task = await taskRepository.GetByIdAsync(dto.Id);
@@ -169,6 +175,7 @@ namespace TaskFlow.Application.Services
         }
         public async  Task<ResponseTaskDto> AssignAsync(AssignTaskDto dto, int currentUserId)
         {
+            await assignTaskValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
 
             var task = await taskRepository.GetByIdAsync(dto.TaskId);
@@ -201,6 +208,7 @@ namespace TaskFlow.Application.Services
         }
         public async Task ChangeStatusAsync(ChangeTaskStatusDto dto,int currentUserId)
         {
+            await changeStatusValidator.ValidateAndThrowAsync(dto);
             var task = await taskRepository.GetByIdAsync(dto.TaskId);
             if (task == null || task.IsDeleted)
             {

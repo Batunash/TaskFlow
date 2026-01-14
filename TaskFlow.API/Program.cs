@@ -1,13 +1,16 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Text;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Application.Services;
+using TaskFlow.Application.Validators;
 using TaskFlow.Infrastructure.Identity;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
-using TaskFlow.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +37,7 @@ builder.Services.AddScoped<IWorkflowRepository, WorkflowRepository>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.Services.TaskService).Assembly));
+builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
 var jwtSettings = new JwtSettings();
 builder.Configuration.Bind("JwtSettings", jwtSettings);
 builder.Services.AddSingleton(jwtSettings);

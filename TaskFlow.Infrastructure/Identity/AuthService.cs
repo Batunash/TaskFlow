@@ -6,13 +6,16 @@ using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Exceptions;
 using TaskFlow.Infrastructure.Repositories;
+using FluentValidation;
 namespace TaskFlow.Infrastructure.Identity
 {
 
-    public class AuthService(IPasswordHash passwordHash, JwtTokenGenerator jwtTokenGenerator, IUserRepository userRepository) : IAuthService
+    public class AuthService(IPasswordHash passwordHash, JwtTokenGenerator jwtTokenGenerator, IUserRepository userRepository,
+                            IValidator<RegisterDto>registerValidator,IValidator<LoginDto> loginValidator) : IAuthService
     {
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto request)
         {
+            await registerValidator.ValidateAndThrowAsync(request);
             var existingUser = await userRepository.GetByUserNameAsync(request.UserName);
             if (existingUser != null)
             {
@@ -43,8 +46,8 @@ namespace TaskFlow.Infrastructure.Identity
         }
        public async Task<AuthResponseDto> LoginAsync(LoginDto request) 
         { 
+            await loginValidator.ValidateAndThrowAsync(request);
 
-    
             var user = await userRepository.GetByUserNameAsync(request.UserName);
 
             if (user == null)

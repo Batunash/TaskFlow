@@ -5,9 +5,11 @@ using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Exceptions;
+using FluentValidation;
 namespace TaskFlow.Application.Services
 {
-    public class WorkflowService(IWorkflowRepository workflowRepository) : IWorkflowService
+    public class WorkflowService(IWorkflowRepository workflowRepository, IValidator<WorkflowStateDto> stateValidator,
+        IValidator<WorkflowTransitionDto> transitionValidator) : IWorkflowService
     {
         public async Task<WorkflowDto> CreateWorkflowAsync(int projectId)
         {
@@ -54,7 +56,7 @@ namespace TaskFlow.Application.Services
         }
         public async Task<WorkflowStateDto> AddStateAsync(int projectId, WorkflowStateDto stateDto)
         {
-            
+            await stateValidator.ValidateAndThrowAsync(stateDto);
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
                 ?? throw new NotFoundException($"Workflow for project {projectId} not found.");
@@ -80,6 +82,7 @@ namespace TaskFlow.Application.Services
         }
         public async Task<WorkflowTransitionDto> AddTransitionAsync(int projectId, WorkflowTransitionDto transitionDto)
         {
+            await transitionValidator.ValidateAndThrowAsync(transitionDto);
             var workflow = await workflowRepository
                 .GetByProjectIdAsync(projectId)
                 ?? throw new NotFoundException($"Workflow for project {projectId} not found.");

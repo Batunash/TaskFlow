@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json;
 using TaskFlow.Domain.Exceptions;
-
+using FluentValidation;
 namespace TaskFlow.API.Middlewares
 {
     public class GlobalExceptionHandlerMiddleware(RequestDelegate requestDelegate,ILogger<GlobalExceptionHandlerMiddleware> logger) 
@@ -27,7 +27,8 @@ namespace TaskFlow.API.Middlewares
                 BusinessRuleException => (int)HttpStatusCode.BadRequest,     // 400
                 UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized, // 401
                 KeyNotFoundException => (int)HttpStatusCode.NotFound,        // 404
-                ArgumentException => (int)HttpStatusCode.BadRequest,         // 400
+                ArgumentException => (int)HttpStatusCode.BadRequest,           //400
+                ValidationException => (int)HttpStatusCode.BadRequest,      //400
                 _ => (int)HttpStatusCode.InternalServerError                 // 500
             };
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FluentValidation;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,10 +11,13 @@ using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Application.Services
 {
-    public class ProjectService(IProjectRepository projectRepository,ICurrentTenantService currentTenantService) : IProjectService
+    public class ProjectService(IProjectRepository projectRepository,ICurrentTenantService currentTenantService,
+        IValidator<CreateProjectDto> createProjectValidator,IValidator<UpdateProjectDto> updateProjectValidator,
+        IValidator<AddProjectMemberDto> addMemberValidator,IValidator<RemoveProjectMemberDto> removeMemberValidator) : IProjectService
     {
         public async Task<ResponseProjectDto> CreateProjectAsync(CreateProjectDto request,int currentUserId)
         {
+            await createProjectValidator.ValidateAndThrowAsync(request);
             var organizationId = GetRequiredOrganizationId();
 
             var project = new Project(
@@ -34,6 +38,7 @@ namespace TaskFlow.Application.Services
 
         public async Task<ResponseProjectDto> UpdateProjectAsync(UpdateProjectDto dto,int currentUserId)
         {
+            await updateProjectValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
 
             var project = await projectRepository.GetByIdAsync(dto.Id);
@@ -118,6 +123,7 @@ namespace TaskFlow.Application.Services
 
         public async Task AddMemberAsync(AddProjectMemberDto dto,int currentUserId)
         {
+            await addMemberValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
 
             var project = await projectRepository.GetByIdAsync(dto.ProjectId);
@@ -137,6 +143,7 @@ namespace TaskFlow.Application.Services
         }
         public async Task RemoveMemberAsync(RemoveProjectMemberDto dto,int currentUserId)
         {
+            await removeMemberValidator.ValidateAndThrowAsync(dto);
             var organizationId = GetRequiredOrganizationId();
 
             var project = await projectRepository.GetByIdAsync(dto.ProjectId);
