@@ -9,10 +9,18 @@ using TaskFlow.Application.Events;
 
 namespace TaskFlow.Infrastructure.Persistence
 {
-    public class AppDbContext(
-        DbContextOptions<AppDbContext> options,ICurrentTenantService currentTenantService,
-        ICurrentUserService currentUserService) : DbContext(options)
+
+    public class AppDbContext : DbContext
     {
+        private readonly ICurrentTenantService _currentTenantService;
+        private readonly ICurrentUserService _currentUserService;
+        public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenantService currentTenantService, ICurrentUserService currentUserService) : base(options)
+        {
+            _currentTenantService = currentTenantService;
+            _currentUserService = currentUserService;
+        }
+        internal int? CurrentTenantId => _currentTenantService.OrganizationId;
+        internal int? CurrentUserId => _currentUserService.UserId;
         public DbSet<User> Users => Set<User>();
         public DbSet<Organization> Organizations => Set<Organization>();
         public DbSet<Project> Projects => Set<Project>();
@@ -25,14 +33,16 @@ namespace TaskFlow.Infrastructure.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            var currentTenantId = currentTenantService.OrganizationId;
-            var currentUserId = currentUserService.UserId;
-            modelBuilder.Entity<TaskItem>().HasQueryFilter(x => !x.IsDeleted);
             modelBuilder.Entity<Project>().HasQueryFilter(p =>
-                !currentTenantId.HasValue || p.OrganizationId == currentTenantId
+                !p.IsDeleted &&
+                (!CurrentTenantId.HasValue || p.OrganizationId == CurrentTenantId)
             );
             modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
-                !currentTenantId.HasValue || t.OrganizationId == currentTenantId
+                !t.IsDeleted &&
+                (!CurrentTenantId.HasValue || t.OrganizationId == CurrentTenantId)
+            );
+            modelBuilder.Entity<ProjectMember>().HasQueryFilter(pm =>
+                !CurrentTenantId.HasValue || pm.OrganizationId == CurrentTenantId
             );
             modelBuilder.Entity<TaskItem>(entity =>
             {
@@ -47,11 +57,25 @@ namespace TaskFlow.Infrastructure.Persistence
             modelBuilder.Entity<Project>()
                 .HasIndex(p => new { p.OrganizationId, p.Name })
                 .IsUnique();
+            modelBuilder.Entity<Organization>()
+                .Navigation(o => o.Members)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            modelBuilder.Entity<Workflow>()
+                .Navigation(w => w.States)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            modelBuilder.Entity<Workflow>()
+                .Navigation(w => w.Transitions)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            modelBuilder.Entity<Project>()
+                .Navigation(p => p.Tasks)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
             modelBuilder.Entity<ProjectMember>(entity =>
             {
                 entity.HasKey(pm => new { pm.ProjectId, pm.UserId });
-
-                entity.HasQueryFilter(pm => !currentTenantId.HasValue || pm.OrganizationId == currentTenantId);
 
                 entity.HasOne(pm => pm.Project)
                       .WithMany(p => p.ProjectMembers)
@@ -73,39 +97,43 @@ namespace TaskFlow.Infrastructure.Persistence
                 entity.Property(e => e.AllowedRoles)
                     .HasConversion(
                         v => string.Join(",", v),
-                        v => v.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
+                        v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
                     )
-                    .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyCollection<string>>(
-                        (c1, c2) => c1.SequenceEqual(c2),
-                        c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                        c => c.ToList()));
+                    .Metadata.SetValueComparer(
+                        new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyCollection<string>>(
+                            (c1, c2) => c1.SequenceEqual(c2),
+                            c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                            c => c.ToList()
+                        )
+                    );
             });
+
         }
 
-        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,CancellationToken cancellationToken = default)
         {
-            var currentUserId = currentUserService.UserId?.ToString();
+            var currentUserIdStr = CurrentUserId?.ToString();
             foreach (var entry in ChangeTracker.Entries<IAuditableEntity>())
             {
                 switch (entry.State)
                 {
                     case EntityState.Added:
                         entry.Entity.CreatedAt = DateTime.UtcNow;
-                        entry.Entity.CreatedBy = currentUserId;
+                        entry.Entity.CreatedBy = currentUserIdStr;
                         break;
                     case EntityState.Modified:
                         entry.Entity.LastModifiedAt = DateTime.UtcNow;
-                        entry.Entity.LastModifiedBy = currentUserId;
+                        entry.Entity.LastModifiedBy = currentUserIdStr;
                         break;
                 }
             }
             foreach (var entry in ChangeTracker.Entries<IHasOrganization>())
             {
-                if (entry.State == EntityState.Added && currentTenantService.OrganizationId.HasValue)
+                if (entry.State == EntityState.Added && CurrentTenantId.HasValue)
                 {
                     if (entry.Entity.OrganizationId == 0)
                     {
-                        entry.Entity.OrganizationId = currentTenantService.OrganizationId.Value;
+                        entry.Entity.OrganizationId = CurrentTenantId.Value;
                     }
                 }
             }
@@ -116,7 +144,7 @@ namespace TaskFlow.Infrastructure.Persistence
                     entry.State = EntityState.Modified;
                     entry.Entity.IsDeleted = true;
                     entry.Entity.DeletedAt = DateTime.UtcNow;
-                    entry.Entity.DeletedBy = currentUserId;
+                    entry.Entity.DeletedBy = currentUserIdStr;
                 }
             }
             return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);

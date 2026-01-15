@@ -5,14 +5,18 @@ using TaskFlow.Domain.Enums;
 
 namespace TaskFlow.Domain.Entities
 {
-    public class Project : IHasOrganization, IAuditableEntity
+    public class Project : IHasOrganization, IAuditableEntity, ISoftDelete
     {
         public int Id { get; private set; }
         public string Name { get; private set; } = string.Empty;
         public string Description { get; private set; } = string.Empty;
+
         public int OrganizationId { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? CreatedBy { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
+        public string? DeletedBy { get; set; }
         public DateTime? LastModifiedAt { get; set; }
         public string? LastModifiedBy { get; set; }
         public Organization? Organization { get; private set; }
