@@ -266,5 +266,20 @@ namespace TaskFlow.Tests.InfrastructureTest.Repositories
             dbProject!.Name.Should().Be("New Name");
             dbProject.LastModifiedAt.Should().NotBeNull(); 
         }
+        [Fact]
+        public async Task ExistsByNameAsync_Should_Check_Case_Insensitivity()
+        {
+            // Arrange
+            var (user, org) = await SeedOrganizationAsync();
+            var project = new Project("AlphaProject", "Desc", org.Id);
+            await DbContext.Projects.AddAsync(project);
+            await DbContext.SaveChangesAsync();
+
+            // Act
+            var exists = await _repository.ExistsByNameAsync("alphaproject", org.Id);
+
+            // Assert
+            exists.Should().BeTrue("Project names should be unique regardless of case");
+        }
     }
 }

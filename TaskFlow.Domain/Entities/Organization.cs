@@ -31,7 +31,14 @@ namespace TaskFlow.Domain.Entities
             _members.Add(new OrganizationMember(ownerId, OrganizationRole.Owner));
 
         }
-
+        public void Update(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new ArgumentException("Name required");
+            }
+            Name = name;
+        }
         public void AddMember(int userId, OrganizationRole role)
         {
             if (_members.Any(m => m.UserId == userId))

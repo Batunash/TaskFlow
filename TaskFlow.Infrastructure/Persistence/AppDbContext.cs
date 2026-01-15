@@ -72,6 +72,13 @@ namespace TaskFlow.Infrastructure.Persistence
             modelBuilder.Entity<Project>()
                 .Navigation(p => p.Tasks)
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.UserName)
+                .IsUnique();
+
+            modelBuilder.Entity<Organization>()
+                .HasIndex(o => o.Name)
+                .IsUnique();
 
             modelBuilder.Entity<ProjectMember>(entity =>
             {
