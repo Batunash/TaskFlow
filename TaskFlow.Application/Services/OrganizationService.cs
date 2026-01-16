@@ -23,22 +23,25 @@ namespace TaskFlow.Application.Services
                 throw new BusinessRuleException($"Organization with name '{request.Name}' already exists.");
             }
             await createOrgValidator.ValidateAndThrowAsync(request);
+
             var organization = new Organization(
                 name: request.Name,
                 ownerId: currentUserId
             );
+
+            await organizationRepository.AddAsync(organization);
             var user = await userRepository.GetByIdAsync(currentUserId);
-            if (user != null) {
-                user.OrganizationId = organization.Id;
+            if (user != null)
+            {
+                user.OrganizationId = organization.Id; 
                 await organizationRepository.SaveChangesAsync();
             }
-                await organizationRepository.AddAsync(organization);
+
             return new ResponseOrganizationDto
             {
                 Id = organization.Id,
                 Name = organization.Name
             };
-               
         }
 
         public async Task<ResponseOrganizationDto> GetCurrentAsync() 
