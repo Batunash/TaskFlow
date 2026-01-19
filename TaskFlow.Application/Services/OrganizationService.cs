@@ -80,7 +80,11 @@ namespace TaskFlow.Application.Services
             }
 
             organization.AddMember(dto.UserId,OrganizationRole.Member);
-
+            var user = await userRepository.GetByIdAsync(dto.UserId);
+            if (user != null && user.OrganizationId == null)
+            {
+                user.OrganizationId = organization.Id;
+            }
             await organizationRepository.SaveChangesAsync();
         }
 

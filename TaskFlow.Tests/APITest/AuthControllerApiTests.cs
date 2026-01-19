@@ -12,9 +12,6 @@ public class AuthControllerEdgeCaseApiTests : BaseApiTests
         : base(fixture)
     {
     }
-
-    // ---------------- REGISTER ----------------
-
     [Fact]
     public async Task Register_ShouldFail_WhenUsernameIsEmpty()
     {
@@ -68,9 +65,6 @@ public class AuthControllerEdgeCaseApiTests : BaseApiTests
             response.StatusCode == HttpStatusCode.UnsupportedMediaType
         );
     }
-
-    // ---------------- LOGIN ----------------
-
     [Fact]
     public async Task Login_ShouldFail_WhenUserDoesNotExist()
     {
@@ -124,9 +118,6 @@ public class AuthControllerEdgeCaseApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------------- ME ----------------
-
     [Fact]
     public async Task Me_ShouldReturn401_WhenTokenIsMissing()
     {
@@ -149,8 +140,6 @@ public class AuthControllerEdgeCaseApiTests : BaseApiTests
     [Fact]
     public async Task Me_ShouldReturn401_WhenTokenIsExpired()
     {
-        // Bu test varsayımsal: 
-        // Eğer test ortamında kısa ömürlü token üretiyorsan aktif olur
         Client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", "expired.token.example");
 
@@ -178,10 +167,8 @@ public class AuthControllerEdgeCaseApiTests : BaseApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("UserId", content);
+        Assert.Contains("userId", content);
     }
-
-    // ---------------- SECURITY / CONTRACT ----------------
 
     [Fact]
     public async Task Register_ShouldIgnore_ExtraFields_InRequestBody()

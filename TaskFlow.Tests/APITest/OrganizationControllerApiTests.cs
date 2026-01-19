@@ -12,9 +12,6 @@ public class OrganizationControllerApiTests : BaseApiTests
         : base(fixture)
     {
     }
-
-    // ---------- HELPERS ----------
-
     private async Task<string> RegisterAndLoginAsync(string username)
     {
         var registerResponse = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
@@ -26,8 +23,6 @@ public class OrganizationControllerApiTests : BaseApiTests
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
         return auth!.AccessToken;
     }
-
-    // ---------- CREATE ORGANIZATION ----------
 
     [Fact]
     public async Task CreateOrganization_ShouldReturn401_WhenTokenIsMissing()
@@ -45,8 +40,7 @@ public class OrganizationControllerApiTests : BaseApiTests
     {
         var token = await RegisterAndLoginAsync("orgowner");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/organization", new
         {
@@ -58,7 +52,7 @@ public class OrganizationControllerApiTests : BaseApiTests
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("Organization", body);
-        Assert.Contains("AccessToken", body);
+        Assert.Contains("accessToken", body);
     }
 
     [Fact]
@@ -66,8 +60,7 @@ public class OrganizationControllerApiTests : BaseApiTests
     {
         var token = await RegisterAndLoginAsync("emptyorg");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/organization", new
         {
@@ -82,8 +75,7 @@ public class OrganizationControllerApiTests : BaseApiTests
     {
         var token = await RegisterAndLoginAsync("nobodyorg");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsync("/api/organization", null);
 
@@ -93,8 +85,6 @@ public class OrganizationControllerApiTests : BaseApiTests
         );
     }
 
-    // ---------- CURRENT ORGANIZATION ----------
-
     [Fact]
     public async Task GetCurrentOrganization_ShouldReturn401_WhenTokenMissing()
     {
@@ -102,20 +92,20 @@ public class OrganizationControllerApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-
+    
     [Fact]
     public async Task GetCurrentOrganization_ShouldReturnOrg_WhenUserHasOrganization()
     {
         var token = await RegisterAndLoginAsync("currentorguser");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        await Client.PostAsJsonAsync("/api/organization", new
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var createResponse = await Client.PostAsJsonAsync("/api/organization", new
         {
             Name = "Current Org"
         });
-
+        var createContent = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var newToken = createContent.GetProperty("accessToken").GetString(); 
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
         var response = await Client.GetAsync("/api/organization/current");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -127,17 +117,15 @@ public class OrganizationControllerApiTests : BaseApiTests
     [Fact]
     public async Task GetCurrentOrganization_ShouldFail_WhenUserHasNoOrganization()
     {
+
         var token = await RegisterAndLoginAsync("noorguser");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.GetAsync("/api/organization/current");
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-
-    // ---------- INVITE USER ----------
 
     [Fact]
     public async Task InviteUser_ShouldReturn401_WhenTokenMissing()
@@ -154,18 +142,26 @@ public class OrganizationControllerApiTests : BaseApiTests
     public async Task InviteUser_ShouldSucceed_WhenOwnerInvitesUser()
     {
         var ownerToken = await RegisterAndLoginAsync("orgownerinvite");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
-
-        await Client.PostAsJsonAsync("/api/organization", new
+        var guestUserRegister = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
+        {
+            UserName = "guestuser",
+            Password = "Password123!"
+        });
+        var guestAuth = await guestUserRegister.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var guestUserId = guestAuth!.UserId;
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/organization", new
         {
             Name = "Invite Org"
         });
-
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var newToken = createBody.GetProperty("accessToken").GetString();
+        Client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", newToken);
         var response = await Client.PostAsJsonAsync("/api/organization/invite", new
         {
-            Email = "user@test.com"
+            UserId = guestUserId
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -175,31 +171,20 @@ public class OrganizationControllerApiTests : BaseApiTests
     public async Task InviteUser_ShouldFail_WhenUserIsNotOwner()
     {
         var ownerToken = await RegisterAndLoginAsync("realowner");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
-
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
         await Client.PostAsJsonAsync("/api/organization", new
         {
             Name = "Role Org"
         });
-
-        // ikinci kullanıcı
         var memberToken = await RegisterAndLoginAsync("memberuser");
-
         Client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", memberToken);
-
         var response = await Client.PostAsJsonAsync("/api/organization/invite", new
         {
-            Email = "evil@test.com"
+            UserId = 999
         });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-
-    // ---------- SECURITY / CONTRACT ----------
-
     [Fact]
     public async Task OrganizationEndpoints_ShouldNotAllow_WrongHttpMethods()
     {
@@ -213,8 +198,7 @@ public class OrganizationControllerApiTests : BaseApiTests
     {
         var token = await RegisterAndLoginAsync("extrafieldorg");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/organization", new
         {

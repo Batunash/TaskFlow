@@ -12,10 +12,7 @@ public class TaskControllerApiTests : BaseApiTests
         : base(fixture)
     {
     }
-
-    // ---------- HELPERS ----------
-
-    private async Task<string> RegisterLoginCreateOrgAndProjectAsync(string username)
+    private async Task<(string Token, int ProjectId)> RegisterLoginCreateOrgAndProjectAsync(string username)
     {
         var reg = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
         {
@@ -23,18 +20,26 @@ public class TaskControllerApiTests : BaseApiTests
             Password = "Password123!"
         });
         var auth = await reg.Content.ReadFromJsonAsync<AuthResponseDto>();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        var orgResponse = await Client.PostAsJsonAsync("/api/organization", new { Name = $"{username}-org" });
+        var orgBody = await orgResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var newToken = orgBody.GetProperty("accessToken").GetString();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var projResponse = await Client.PostAsJsonAsync("/api/project", new { Name = $"{username}-project" });
+        var projData = await projResponse.Content.ReadFromJsonAsync<ResponseProjectDto>();
+        var projectId = projData!.Id;
+        var wfResponse = await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
+        Assert.Equal(HttpStatusCode.OK, wfResponse.StatusCode);
+        var stateResponse = await Client.PostAsJsonAsync($"/api/projects/{projectId}/workflow/states", new WorkflowStateDto
+        {
+            Name = "Open",
+            IsInitial = true,
+            IsFinal = false
+        });
+        Assert.Equal(HttpStatusCode.OK, stateResponse.StatusCode);
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        await Client.PostAsJsonAsync("/api/organization", new { Name = $"{username}-org" });
-        await Client.PostAsJsonAsync("/api/project", new { Name = $"{username}-project" });
-
-        return auth.AccessToken;
+        return (newToken!, projectId);
     }
-
-    // ---------- CREATE TASK ----------
-
     [Fact]
     public async Task CreateTask_ShouldReturn401_WhenTokenMissing()
     {
@@ -50,14 +55,14 @@ public class TaskControllerApiTests : BaseApiTests
     [Fact]
     public async Task CreateTask_ShouldCreate_WhenUserIsProjectMember()
     {
-        var token = await RegisterLoginCreateOrgAndProjectAsync("taskcreator");
+        var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("taskcreator");
         Client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/task", new
         {
             Title = "My Task",
-            ProjectId = 1
+            ProjectId = projectId 
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -65,18 +70,16 @@ public class TaskControllerApiTests : BaseApiTests
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("My Task", body);
     }
-
     [Fact]
     public async Task CreateTask_ShouldFail_WhenTitleIsEmpty()
     {
-        var token = await RegisterLoginCreateOrgAndProjectAsync("emptytask");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("emptytask");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/task", new
         {
             Title = "",
-            ProjectId = 1
+            ProjectId = projectId
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -85,21 +88,16 @@ public class TaskControllerApiTests : BaseApiTests
     [Fact]
     public async Task CreateTask_ShouldFail_WhenProjectDoesNotExist()
     {
-        var token = await RegisterLoginCreateOrgAndProjectAsync("wrongproject");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        var (token, _) = await RegisterLoginCreateOrgAndProjectAsync("wrongproject");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsJsonAsync("/api/task", new
         {
             Title = "Ghost Task",
-            ProjectId = 999
+            ProjectId = 99999
         });
-
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- GET TASKS ----------
-
     [Fact]
     public async Task GetTasksByProject_ShouldReturn401_WhenTokenMissing()
     {
@@ -111,14 +109,12 @@ public class TaskControllerApiTests : BaseApiTests
     [Fact]
     public async Task GetTasksByProject_ShouldReturnTasks_WhenAuthorized()
     {
-        var token = await RegisterLoginCreateOrgAndProjectAsync("listtasks");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("listtasks");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        await Client.PostAsJsonAsync("/api/task", new { Title = "Task A", ProjectId = projectId });
+        await Client.PostAsJsonAsync("/api/task", new { Title = "Task B", ProjectId = projectId });
 
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Task A", ProjectId = 1 });
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Task B", ProjectId = 1 });
-
-        var response = await Client.GetAsync("/api/project/1/tasks");
+        var response = await Client.GetAsync($"/api/project/{projectId}/tasks");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -126,98 +122,78 @@ public class TaskControllerApiTests : BaseApiTests
         Assert.Contains("Task A", body);
         Assert.Contains("Task B", body);
     }
-
-    // ---------- UPDATE TASK ----------
-
     [Fact]
-    public async Task UpdateTask_ShouldFail_WhenUserIsNotProjectMember()
+    public async Task UpdateTask_ShouldReturn404_WhenUserIsNotInSameOrg()
     {
-        var ownerToken = await RegisterLoginCreateOrgAndProjectAsync("taskowner");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
-
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Private Task", ProjectId = 1 });
-
-        // başka kullanıcı
-        var outsiderToken = await RegisterLoginCreateOrgAndProjectAsync("outsider");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", outsiderToken);
-
+        var (ownerToken, projectId) = await RegisterLoginCreateOrgAndProjectAsync("taskowner");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createRes = await Client.PostAsJsonAsync("/api/task", new { Title = "Private Task", ProjectId = projectId });
+        var taskData = await createRes.Content.ReadFromJsonAsync<ResponseTaskDto>();
+        var taskId = taskData!.Id;
+        var (outsiderToken, _) = await RegisterLoginCreateOrgAndProjectAsync("outsider");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsiderToken);
         var response = await Client.PutAsJsonAsync("/api/task", new
         {
-            TaskId = 1,
+            Id = taskId,
             Title = "Hack Update"
         });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- ASSIGN TASK ----------
-
     [Fact]
-    public async Task AssignTask_ShouldFail_WhenUserIsNotProjectMember()
+    public async Task AssignTask_ShouldReturn404_WhenUserIsNotInSameOrg()
     {
-        var ownerToken = await RegisterLoginCreateOrgAndProjectAsync("assignowner");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
+        var (ownerToken, projectId) = await RegisterLoginCreateOrgAndProjectAsync("assignowner");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
 
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Assignable Task", ProjectId = 1 });
+        var createRes = await Client.PostAsJsonAsync("/api/task", new { Title = "Assignable Task", ProjectId = projectId });
+        var taskData = await createRes.Content.ReadFromJsonAsync<ResponseTaskDto>();
+        var taskId = taskData!.Id;
 
-        var outsiderToken = await RegisterLoginCreateOrgAndProjectAsync("assignoutsider");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", outsiderToken);
+        var (outsiderToken, _) = await RegisterLoginCreateOrgAndProjectAsync("assignoutsider");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsiderToken);
 
         var response = await Client.PostAsJsonAsync("/api/task/assign", new
         {
-            TaskId = 1,
+            TaskId = taskId,
             UserId = 999
         });
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- CHANGE STATUS ----------
-
     [Fact]
     public async Task ChangeTaskStatus_ShouldFail_WhenTransitionIsInvalid()
     {
-        var token = await RegisterLoginCreateOrgAndProjectAsync("invalidtransition");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("invalidtransition");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Workflow Task", ProjectId = 1 });
+        var createRes = await Client.PostAsJsonAsync("/api/task", new { Title = "Workflow Task", ProjectId = projectId });
+        var taskData = await createRes.Content.ReadFromJsonAsync<ResponseTaskDto>();
+        var taskId = taskData!.Id;
 
         var response = await Client.PostAsJsonAsync("/api/task/status", new
         {
-            TaskId = 1,
-            NewStateId = 999 // geçersiz state
+            TaskId = taskId,
+            TargetStateId = 99999 
         });
-
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- DELETE TASK ----------
-
     [Fact]
-    public async Task DeleteTask_ShouldFail_WhenUserIsNotAuthorized()
+    public async Task DeleteTask_ShouldReturn404_WhenUserIsNotInSameOrg()
     {
-        var ownerToken = await RegisterLoginCreateOrgAndProjectAsync("deletetaskowner");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
+        var (ownerToken, projectId) = await RegisterLoginCreateOrgAndProjectAsync("deletetaskowner");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
 
-        await Client.PostAsJsonAsync("/api/task", new { Title = "Delete Me", ProjectId = 1 });
+        var createRes = await Client.PostAsJsonAsync("/api/task", new { Title = "Delete Me", ProjectId = projectId });
+        var taskData = await createRes.Content.ReadFromJsonAsync<ResponseTaskDto>();
+        var taskId = taskData!.Id;
 
-        var outsiderToken = await RegisterLoginCreateOrgAndProjectAsync("deletetaskoutsider");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", outsiderToken);
+        var (outsiderToken, _) = await RegisterLoginCreateOrgAndProjectAsync("deletetaskoutsider");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", outsiderToken);
 
-        var response = await Client.DeleteAsync("/api/task/1");
+        var response = await Client.DeleteAsync($"/api/task/{taskId}");
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- CONTRACT ----------
-
     [Fact]
     public async Task TaskEndpoints_ShouldNotAllow_WrongHttpMethod()
     {

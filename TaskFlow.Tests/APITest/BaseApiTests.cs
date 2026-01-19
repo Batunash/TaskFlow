@@ -1,5 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Respawn;
+using System.Net.Http.Headers;
+using TaskFlow.Domain.Entities;
+using TaskFlow.Infrastructure.Identity;
 using TaskFlow.Infrastructure.Persistence;
 using Xunit;
 
@@ -52,5 +55,24 @@ public abstract class BaseApiTests
         Client.Dispose();
         _factory.Dispose();
         return Task.CompletedTask;
+    }
+    protected async Task AuthenticateAsync(string username = "testuser", string role = "User")
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tokenGenerator = scope.ServiceProvider.GetRequiredService<JwtTokenGenerator>();
+        var user = new User(username, "HashedPassword");
+        if (!context.Users.Any(u => u.UserName == username))
+        {
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            user = context.Users.First(u => u.UserName == username);
+        }
+        var token = tokenGenerator.Generate(user.Id, 1, role); 
+        Client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
     }
 }

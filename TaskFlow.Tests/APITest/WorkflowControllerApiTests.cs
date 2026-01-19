@@ -6,15 +6,12 @@ using Xunit;
 
 namespace TaskFlow.Tests.APITest;
 
-public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
+public class WorkflowControllerApiTests : BaseApiTests
 {
-    public WorkflowControllerEdgeCaseApiTests(ApiDatabaseFixture fixture)
+    public WorkflowControllerApiTests (ApiDatabaseFixture fixture)
         : base(fixture)
     {
     }
-
-    // ---------- HELPERS ----------
-
     private async Task<(string token, int projectId)> RegisterLoginCreateOrgAndProjectAsync(string username)
     {
         var reg = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
@@ -23,20 +20,19 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
             Password = "Password123!"
         });
         var auth = await reg.Content.ReadFromJsonAsync<AuthResponseDto>();
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        await Client.PostAsJsonAsync("/api/organization", new { Name = $"{username}-org" });
-
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        var orgResponse = await Client.PostAsJsonAsync("/api/organization", new { Name = $"{username}-org" });
+        orgResponse.EnsureSuccessStatusCode();
+        var node = await orgResponse.Content.ReadFromJsonAsync<System.Text.Json.Nodes.JsonNode>();
+        var newAccessToken = node?["accessToken"]?.ToString();
+        Assert.False(string.IsNullOrEmpty(newAccessToken), "Yeni token alınamadı!");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newAccessToken);
         var projectResp = await Client.PostAsJsonAsync("/api/project", new { Name = $"{username}-project" });
-        var projectBody = await projectResp.Content.ReadAsStringAsync();
+        projectResp.EnsureSuccessStatusCode();
+        var projectDto = await projectResp.Content.ReadFromJsonAsync<ResponseProjectDto>();
 
-        // Basitlik için 1 varsayıyoruz; projende response DTO varsa burayı parse et
-        return (auth.AccessToken, 1);
+        return (newAccessToken!, projectDto!.Id);
     }
-
-    // ---------- CREATE WORKFLOW ----------
 
     [Fact]
     public async Task CreateWorkflow_ShouldReturn401_WhenTokenMissing()
@@ -49,8 +45,7 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
     public async Task CreateWorkflow_ShouldCreate_WhenProjectExists()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfcreator");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -60,15 +55,11 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
     public async Task CreateWorkflow_ShouldFail_WhenProjectDoesNotExist()
     {
         var (token, _) = await RegisterLoginCreateOrgAndProjectAsync("wfmissing");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.PostAsync("/api/projects/999/workflow", null);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- GET WORKFLOW ----------
-
     [Fact]
     public async Task GetWorkflow_ShouldReturn401_WhenTokenMissing()
     {
@@ -80,23 +71,18 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
     public async Task GetWorkflow_ShouldReturnWorkflow_WhenExists()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfget");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
         var response = await Client.GetAsync($"/api/projects/{projectId}/workflow");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
-
-    // ---------- ADD STATE ----------
-
     [Fact]
     public async Task AddState_ShouldFail_WhenNameIsEmpty()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfemptystate");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
@@ -112,8 +98,7 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
     public async Task AddState_ShouldFail_WhenDuplicateStateName()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfdupstate");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
@@ -129,15 +114,11 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- ADD TRANSITION ----------
-
     [Fact]
     public async Task AddTransition_ShouldFail_WhenStatesDoNotExist()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfbadtransition");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
@@ -157,8 +138,7 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
     public async Task AddTransition_ShouldFail_WhenSelfTransition()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfselftransition");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
@@ -166,8 +146,6 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
             $"/api/projects/{projectId}/workflow/states",
             new WorkflowStateDto { Name = "InProgress" }
         );
-
-        // StateId'yi response’tan parse et (örnek için 1 varsayıyoruz)
         var response = await Client.PostAsJsonAsync(
             $"/api/projects/{projectId}/workflow/transitions",
             new WorkflowTransitionDto
@@ -179,15 +157,11 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- REMOVE STATE ----------
-
     [Fact]
     public async Task RemoveState_ShouldFail_WhenStateIsUsedInTransition()
     {
         var (token, projectId) = await RegisterLoginCreateOrgAndProjectAsync("wfremovestate");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
 
@@ -215,9 +189,6 @@ public class WorkflowControllerEdgeCaseApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- CONTRACT ----------
-
     [Fact]
     public async Task WorkflowEndpoints_ShouldNotAllow_WrongHttpMethod()
     {

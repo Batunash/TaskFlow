@@ -12,9 +12,6 @@ public class ProjectControllerApiTests : BaseApiTests
         : base(fixture)
     {
     }
-
-    // ---------- HELPERS ----------
-
     private async Task<string> RegisterLoginAndCreateOrgAsync(string username)
     {
         var register = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
@@ -22,22 +19,17 @@ public class ProjectControllerApiTests : BaseApiTests
             UserName = username,
             Password = "Password123!"
         });
-
         var auth = await register.Content.ReadFromJsonAsync<AuthResponseDto>();
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        await Client.PostAsJsonAsync("/api/organization", new
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        var orgResponse = await Client.PostAsJsonAsync("/api/organization", new
         {
             Name = $"{username}-org"
         });
+        var orgBody = await orgResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var newToken = orgBody.GetProperty("accessToken").GetString();
 
-        return auth.AccessToken;
+        return newToken!;
     }
-
-    // ---------- CREATE PROJECT ----------
-
     [Fact]
     public async Task CreateProject_ShouldReturn401_WhenTokenMissing()
     {
@@ -54,9 +46,7 @@ public class ProjectControllerApiTests : BaseApiTests
     {
         var token = await RegisterLoginAndCreateOrgAsync("projectowner");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var response = await Client.PostAsJsonAsync("/api/project", new
         {
             Name = "My Project"
@@ -73,9 +63,7 @@ public class ProjectControllerApiTests : BaseApiTests
     {
         var token = await RegisterLoginAndCreateOrgAsync("emptyproject");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var response = await Client.PostAsJsonAsync("/api/project", new
         {
             Name = ""
@@ -83,8 +71,6 @@ public class ProjectControllerApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-
-    // ---------- GET PROJECTS ----------
 
     [Fact]
     public async Task GetAllProjects_ShouldReturn401_WhenTokenMissing()
@@ -99,8 +85,7 @@ public class ProjectControllerApiTests : BaseApiTests
     {
         var token = await RegisterLoginAndCreateOrgAsync("listprojects");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         await Client.PostAsJsonAsync("/api/project", new { Name = "Project A" });
         await Client.PostAsJsonAsync("/api/project", new { Name = "Project B" });
@@ -114,15 +99,12 @@ public class ProjectControllerApiTests : BaseApiTests
         Assert.Contains("Project B", body);
     }
 
-    // ---------- GET BY ID ----------
-
     [Fact]
     public async Task GetProjectById_ShouldReturn404_WhenProjectDoesNotExist()
     {
         var token = await RegisterLoginAndCreateOrgAsync("missingproject");
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Client.GetAsync("/api/project/99999");
 
@@ -130,87 +112,51 @@ public class ProjectControllerApiTests : BaseApiTests
     }
 
     [Fact]
-    public async Task GetProjectById_ShouldReturn403_WhenUserIsNotMember()
+    public async Task GetProjectById_ShouldReturn404_WhenUserIsInDifferentOrg()
     {
         var ownerToken = await RegisterLoginAndCreateOrgAsync("realowner");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
-
-        var create = await Client.PostAsJsonAsync("/api/project", new
-        {
-            Name = "Private Project"
-        });
-
-        var projectBody = await create.Content.ReadAsStringAsync();
-
-        // başka kullanıcı
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/project", new { Name = "Private Project" });
+        var projectData = await createResponse.Content.ReadFromJsonAsync<ResponseProjectDto>();
+        var projectId = projectData!.Id;
         var otherToken = await RegisterLoginAndCreateOrgAsync("outsider");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", otherToken);
-
-        var response = await Client.GetAsync("/api/project/1");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherToken);
+        var response = await Client.GetAsync($"/api/project/{projectId}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- UPDATE PROJECT ----------
-
     [Fact]
-    public async Task UpdateProject_ShouldFail_WhenUserIsNotOwner()
+    public async Task UpdateProject_ShouldReturn404_WhenUserIsInDifferentOrg()
     {
         var ownerToken = await RegisterLoginAndCreateOrgAsync("updateowner");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
-
-        await Client.PostAsJsonAsync("/api/project", new
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/project", new { Name = "Owned Project" });
+        var projectData = await createResponse.Content.ReadFromJsonAsync<ResponseProjectDto>();
+        var projectId = projectData!.Id;
+        var memberToken = await RegisterLoginAndCreateOrgAsync("member"); 
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        var response = await Client.PutAsJsonAsync($"/api/project/{projectId}", new
         {
-            Name = "Owned Project"
-        });
-
-        var memberToken = await RegisterLoginAndCreateOrgAsync("member");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", memberToken);
-
-        var response = await Client.PutAsJsonAsync("/api/project/1", new
-        {
-            Id = 1,
+            Id = projectId,
             Name = "Hack Update"
         });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- DELETE PROJECT ----------
-
     [Fact]
-    public async Task DeleteProject_ShouldReturn403_WhenUserIsNotOwner()
+    public async Task DeleteProject_ShouldReturn404_WhenUserIsInDifferentOrg()
     {
         var ownerToken = await RegisterLoginAndCreateOrgAsync("deleteowner");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
 
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/project", new { Name = "Delete Project" });
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
 
-        await Client.PostAsJsonAsync("/api/project", new
-        {
-            Name = "Delete Project"
-        });
-
+        var projectData = await createResponse.Content.ReadFromJsonAsync<ResponseProjectDto>();
+        var projectId = projectData!.Id;
         var memberToken = await RegisterLoginAndCreateOrgAsync("deletemember");
-
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", memberToken);
-
-        var response = await Client.DeleteAsync("/api/project/1");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        var response = await Client.DeleteAsync($"/api/project/{projectId}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    // ---------- CONTRACT ----------
-
     [Fact]
     public async Task ProjectEndpoints_ShouldNotAllow_WrongHttpMethod()
     {

@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using TaskFlow.Application.DTOs;
 using Xunit;
 
@@ -16,7 +17,6 @@ public class FullFlow_EndToEnd_ApiTests : BaseApiTests
     [Fact]
     public async Task FullFlow_Register_To_TaskStatusChange_ShouldWork()
     {
-        // ---------------- REGISTER ----------------
         var registerResponse = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
         {
             UserName = "fullflowuser",
@@ -24,14 +24,10 @@ public class FullFlow_EndToEnd_ApiTests : BaseApiTests
         });
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
-
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
         Assert.NotNull(auth);
-
         Client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        // ---------------- ORGANIZATION ----------------
         var orgResponse = await Client.PostAsJsonAsync("/api/organization", new
         {
             Name = "Full Flow Org"
@@ -39,11 +35,10 @@ public class FullFlow_EndToEnd_ApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.OK, orgResponse.StatusCode);
 
-        // Token yenileniyor (orgId + role içeriyor)
-        var orgBody = await orgResponse.Content.ReadAsStringAsync();
-        Assert.Contains("AccessToken", orgBody);
-
-        // ---------------- PROJECT ----------------
+        var orgNode = await orgResponse.Content.ReadFromJsonAsync<JsonNode>();
+        var newAccessToken = orgNode?["accessToken"]?.ToString();
+        Assert.False(string.IsNullOrEmpty(newAccessToken), "Yeni token dönmedi!");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newAccessToken);
         var projectResponse = await Client.PostAsJsonAsync("/api/project", new
         {
             Name = "Full Flow Project"
@@ -51,35 +46,30 @@ public class FullFlow_EndToEnd_ApiTests : BaseApiTests
 
         Assert.Equal(HttpStatusCode.OK, projectResponse.StatusCode);
 
-        // ---------------- WORKFLOW ----------------
-        var workflowResponse = await Client.PostAsync("/api/projects/1/workflow", null);
+        var projectDto = await projectResponse.Content.ReadFromJsonAsync<ResponseProjectDto>();
+        var projectId = projectDto!.Id;
+        var workflowResponse = await Client.PostAsync($"/api/projects/{projectId}/workflow", null);
         Assert.Equal(HttpStatusCode.OK, workflowResponse.StatusCode);
-
-        // Workflow states
-        await Client.PostAsJsonAsync("/api/projects/1/workflow/states",
-            new WorkflowStateDto { Name = "Todo" });
-
-        await Client.PostAsJsonAsync("/api/projects/1/workflow/states",
-            new WorkflowStateDto { Name = "In Progress" });
-
-        await Client.PostAsJsonAsync("/api/projects/1/workflow/states",
-            new WorkflowStateDto { Name = "Done" });
-
-        // ---------------- TASK ----------------
+        var todoStateResponse = await Client.PostAsJsonAsync($"/api/projects/{projectId}/workflow/states",new WorkflowStateDto { Name = "Todo", IsInitial = true });
+        Assert.Equal(HttpStatusCode.OK, todoStateResponse.StatusCode);
+        var todoState = await todoStateResponse.Content.ReadFromJsonAsync<WorkflowStateDto>();
+        var inProgressStateResponse = await Client.PostAsJsonAsync($"/api/projects/{projectId}/workflow/states",new WorkflowStateDto { Name = "In Progress" });
+        Assert.Equal(HttpStatusCode.OK, inProgressStateResponse.StatusCode);
+        var inProgressState = await inProgressStateResponse.Content.ReadFromJsonAsync<WorkflowStateDto>();
+        await Client.PostAsJsonAsync($"/api/projects/{projectId}/workflow/states",new WorkflowStateDto { Name = "Done", IsFinal = true });
+        var transitionResponse = await Client.PostAsJsonAsync($"/api/projects/{projectId}/workflow/transitions",new WorkflowTransitionDto{FromStateId = todoState!.Id!.Value,ToStateId = inProgressState!.Id!.Value,AllowedRoles = new List<string>()});
+        Assert.Equal(HttpStatusCode.OK, transitionResponse.StatusCode);
         var taskResponse = await Client.PostAsJsonAsync("/api/task", new
         {
             Title = "My First Task",
-            ProjectId = 1
+            ProjectId = projectId
         });
 
         Assert.Equal(HttpStatusCode.OK, taskResponse.StatusCode);
 
-        // ---------------- CHANGE STATUS ----------------
-        var statusResponse = await Client.PostAsJsonAsync("/api/task/status", new
-        {
-            TaskId = 1,
-            NewStateId = 2 // Todo -> In Progress
-        });
+        var taskNode = await taskResponse.Content.ReadFromJsonAsync<JsonNode>();
+        var taskId = taskNode?["id"]?.GetValue<int>();
+        var statusResponse = await Client.PostAsJsonAsync("/api/task/status", new{TaskId = taskId,TargetStateId = inProgressState.Id!.Value});
 
         Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
     }

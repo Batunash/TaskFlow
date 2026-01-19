@@ -28,7 +28,8 @@ namespace TaskFlow.API.Middlewares
                 UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized, // 401
                 KeyNotFoundException => (int)HttpStatusCode.NotFound,        // 404
                 ArgumentException => (int)HttpStatusCode.BadRequest,           //400
-                ValidationException => (int)HttpStatusCode.BadRequest,      //400
+                ValidationException => (int)HttpStatusCode.BadRequest,         //400
+                InvalidOperationException => (int)HttpStatusCode.BadRequest, //400
                 _ => (int)HttpStatusCode.InternalServerError                 // 500
             };
 
