@@ -103,5 +103,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        context.Database.Migrate(); 
+        Console.WriteLine("Update db succes");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Something went wrong while updateing db: {ex.Message}");
+    }
+}
 app.Run();

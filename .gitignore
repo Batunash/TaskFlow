@@ -361,3 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+.env
+.env.development
+.env.production
+.env.local
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.pem
+*.key
+*.cert
