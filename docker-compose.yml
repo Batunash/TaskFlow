@@ -6,24 +6,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:8080"
+    env_file:
+      - .env
     environment:
-      - ConnectionStrings__DefaultConnection=Host=taskflow-db;Port=5432;Database=TaskFlowDB;Username=postgres;Password=${SA_PASSWORD}
-      - ASPNETCORE_ENVIRONMENT=Production
-    depends_on:
-      taskflow-db:
-        condition: service_healthy
-
-  taskflow-db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${SA_PASSWORD}
-      - POSTGRES_DB=TaskFlowDB
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"] 
-      interval: 10s
-      retries: 5
-      start_period: 10s
-      timeout: 5s
+      ASPNETCORE_ENVIRONMENT: Production
+      JwtSettings__Issuer: TaskFlow
+      JwtSettings__Audience: TaskFlowUsers

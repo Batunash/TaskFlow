@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Text;
+using DotNetEnv;
 using System.Threading.RateLimiting;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.Services;
@@ -12,6 +13,7 @@ using TaskFlow.Application.Validators;
 using TaskFlow.Infrastructure.Identity;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,6 +69,17 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskF
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
 var jwtSettings = new JwtSettings();
 builder.Configuration.Bind("JwtSettings", jwtSettings);
+
+if (string.IsNullOrEmpty(jwtSettings.Secret))
+{
+    jwtSettings.Secret = Environment.GetEnvironmentVariable("JwtSettings__Secret");
+    jwtSettings.Issuer = Environment.GetEnvironmentVariable("JwtSettings__Issuer");
+    jwtSettings.Audience = Environment.GetEnvironmentVariable("JwtSettings__Audience");
+}
+if (string.IsNullOrEmpty(jwtSettings.Secret))
+{
+    throw new Exception("Cant read .env file");
+}
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton<JwtTokenGenerator>();
 
