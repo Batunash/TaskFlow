@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Text;
-using DotNetEnv;
 using System.Threading.RateLimiting;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.Services;
@@ -13,10 +12,11 @@ using TaskFlow.Application.Validators;
 using TaskFlow.Infrastructure.Identity;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
-Env.Load();
-
 var builder = WebApplication.CreateBuilder(args);
-
+if (builder.Environment.IsDevelopment())
+{
+    DotNetEnv.Env.Load();
+}
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
@@ -26,7 +26,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("AuthPolicy", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: partition => new FixedWindowRateLimiterOptions
+            factory: _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
                 PermitLimit = 5,
@@ -38,7 +38,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: context.User.Identity?.IsAuthenticated == true
                 ? context.User.FindFirst("userId")?.Value ?? "auth_user"
                 : context.Connection.RemoteIpAddress?.ToString() ?? "anon",
-            factory: partition => new FixedWindowRateLimiterOptions
+            factory: _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
                 PermitLimit = 60,
@@ -46,11 +46,8 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1)
             }));
 });
-
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICurrentTenantService, CurrentTenantService>();
@@ -59,27 +56,27 @@ builder.Services.AddScoped<IPasswordHash, BcryptPasswordHasher>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
-builder.Services.AddScoped<IProjectRepository, ProjectRepository>(); 
+builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IWorkflowRepository, WorkflowRepository>();
 builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.Services.TaskService).Assembly));
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.Services.TaskService).Assembly));
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
 var jwtSettings = new JwtSettings();
 builder.Configuration.Bind("JwtSettings", jwtSettings);
 
+jwtSettings.Secret ??= Environment.GetEnvironmentVariable("JwtSettings__Secret");
+jwtSettings.Issuer ??= Environment.GetEnvironmentVariable("JwtSettings__Issuer");
+jwtSettings.Audience ??= Environment.GetEnvironmentVariable("JwtSettings__Audience");
+
 if (string.IsNullOrEmpty(jwtSettings.Secret))
 {
-    jwtSettings.Secret = Environment.GetEnvironmentVariable("JwtSettings__Secret");
-    jwtSettings.Issuer = Environment.GetEnvironmentVariable("JwtSettings__Issuer");
-    jwtSettings.Audience = Environment.GetEnvironmentVariable("JwtSettings__Audience");
+    throw new Exception("JWT settings could not be loaded from environment variables.");
 }
-if (string.IsNullOrEmpty(jwtSettings.Secret))
-{
-    throw new Exception("Cant read .env file");
-}
+
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton<JwtTokenGenerator>();
 
@@ -98,39 +95,21 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings.Issuer,
         ValidAudience = jwtSettings.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret))
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtSettings.Secret))
     };
 });
-
 var app = builder.Build();
-
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+    app.UseHttpsRedirection();
 }
 app.UseMiddleware<TaskFlow.API.Middlewares.GlobalExceptionHandlerMiddleware>();
 app.UseRateLimiter();
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.MapGet("/", () => "OK");
 app.MapControllers();
-if (!app.Environment.IsEnvironment("Test"))
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        var services = scope.ServiceProvider;
-        try
-        {
-            var context = services.GetRequiredService<AppDbContext>();
-            context.Database.Migrate();
-            Console.WriteLine("Update db succes");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Something went wrong while updateing db: {ex.Message}");
-        }
-    }
-}
 app.Run();
