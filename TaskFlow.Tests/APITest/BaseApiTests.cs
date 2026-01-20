@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Respawn;
 using System.Net.Http.Headers;
 using TaskFlow.Domain.Entities;
@@ -26,26 +28,20 @@ public abstract class BaseApiTests
 
     public async Task InitializeAsync()
     {
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await context.Database.EnsureCreatedAsync();
-        }
-
         if (_respawner == null)
         {
-            using var conn = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync();
 
             _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
             {
-                DbAdapter = DbAdapter.SqlServer,
-                SchemasToInclude = new[] { "dbo" },
+                DbAdapter = DbAdapter.Postgres,
+                SchemasToInclude = new[] { "public" },
                 WithReseed = true
             });
         }
 
-        using var resetConn = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+        await using var resetConn = new NpgsqlConnection(_connectionString);
         await resetConn.OpenAsync();
         await _respawner.ResetAsync(resetConn);
     }
@@ -56,22 +52,25 @@ public abstract class BaseApiTests
         _factory.Dispose();
         return Task.CompletedTask;
     }
-    protected async Task AuthenticateAsync(string username = "testuser", string role = "User")
+
+    protected async Task AuthenticateAsync(
+        string username = "testuser",
+        string role = "User"
+    )
     {
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tokenGenerator = scope.ServiceProvider.GetRequiredService<JwtTokenGenerator>();
-        var user = new User(username, "HashedPassword");
-        if (!context.Users.Any(u => u.UserName == username))
+
+        var user = context.Users.FirstOrDefault(u => u.UserName == username);
+        if (user == null)
         {
+            user = new User(username, "HashedPassword");
             context.Users.Add(user);
             await context.SaveChangesAsync();
         }
-        else
-        {
-            user = context.Users.First(u => u.UserName == username);
-        }
-        var token = tokenGenerator.Generate(user.Id, 1, role); 
+
+        var token = tokenGenerator.Generate(user.Id, 1, role);
         Client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
     }

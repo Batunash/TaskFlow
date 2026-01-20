@@ -18,13 +18,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Test");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
-
+            services.RemoveAll(typeof(AppDbContext)); 
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseSqlServer(_connectionString);
+                options.UseNpgsql(_connectionString);
             });
         });
     }

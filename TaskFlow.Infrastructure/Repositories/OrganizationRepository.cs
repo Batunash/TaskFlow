@@ -12,7 +12,7 @@ namespace TaskFlow.Infrastructure.Repositories
     {
         public async Task<bool> ExistsByNameAsync(string name)
         {
-            return await db.Organizations.AnyAsync(o => o.Name == name);
+            return await db.Organizations.AnyAsync(o => o.Name.ToLower() == name.ToLower());
         }
         public async Task AddAsync(Organization organization)
         {

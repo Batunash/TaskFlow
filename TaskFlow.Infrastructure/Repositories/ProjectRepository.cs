@@ -9,11 +9,14 @@ namespace TaskFlow.Infrastructure.Repositories
 {
     public class ProjectRepository(AppDbContext db) : IProjectRepository
     {
-       
+
         public async Task<bool> ExistsByNameAsync(string name, int organizationId, int? excludeProjectId = null)
-        {
+        { 
             var query = db.Projects.AsQueryable();
-            query = query.Where(p => p.Name == name && p.OrganizationId == organizationId);
+            query = query.Where(p =>
+                p.OrganizationId == organizationId &&
+                p.Name.ToLower() == name.ToLower()
+            );
             if (excludeProjectId.HasValue)
             {
                 query = query.Where(p => p.Id != excludeProjectId.Value);
