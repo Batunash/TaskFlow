@@ -234,7 +234,9 @@ public class OrganizationControllerApiTests : BaseApiTests
     {
         // ARRANGE
         var ownerToken = await RegisterAndLoginAsync("flow_owner");
-        await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto { UserName = "flow_guest", Password = "Password123!" });
+
+        // DÜZELTME: 
+        var guestToken = await RegisterAndLoginAsync("flow_guest");
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
         var createRes = await Client.PostAsJsonAsync("/api/organization", new { Name = "Flow Org" });
         var orgData = await createRes.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -243,10 +245,8 @@ public class OrganizationControllerApiTests : BaseApiTests
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerOrgToken);
         await Client.PostAsJsonAsync("/api/organization/invite", new { UserName = "flow_guest" });
         // ACT
-        var guestToken = await RegisterAndLoginAsync("flow_guest");
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", guestToken);
         var acceptRes = await Client.PostAsync($"/api/organization/accept/{orgId}", null);
-
         // ASSERT
         Assert.Equal(HttpStatusCode.OK, acceptRes.StatusCode);
     }
