@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, X, FolderKanban } from "lucide-react";
+import { Plus, Search, X, FolderKanban, Trash2 } from "lucide-react"; 
 import { Link } from "react-router-dom"; 
 import projectService from "../services/projectService";
 import workflowService from "../services/workflowService"; 
@@ -23,37 +23,34 @@ export default function Projects() {
       const data = await projectService.getAll();
       setProjects(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Projeler yüklenemedi:", error);
+      console.error("Failed to load projects:", error);
       setProjects([]); 
     } finally {
       setLoading(false);
     }
   };
+
   const handleCreateProject = async (e) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
-        alert("Proje adı boş olamaz!");
+        alert("Project name cannot be empty!");
         return;
     }
 
     try {
+      // 1. Projeyi oluştur
       const newProject = await projectService.create(formData);
-      console.log("Proje oluşturuldu:", newProject);
 
       if (newProject && newProject.id) {
         try {
+          // 2. Boş bir workflow oluştur (Default stateler yok, kullanıcı ekleyecek)
           await workflowService.create(newProject.id);
-          console.log("Workflow başarıyla oluşturuldu.");
-          await workflowService.addState(newProject.id, { name: "To Do", isInitial: true, isFinal: false });
-          await workflowService.addState(newProject.id, { name: "In Progress", isInitial: false, isFinal: false });
-          await workflowService.addState(newProject.id, { name: "Done", isInitial: false, isFinal: true });
-
         } catch (wfError) {
-          console.error("Workflow oluşturulurken hata:", wfError);
-          alert("Proje oluşturuldu ancak iş akışı hazırlanamadı. Detay sayfasından 'Yapılandır' diyerek düzeltebilirsiniz.");
+          console.error("Workflow initialization error:", wfError);
         }
       }
+      
       await fetchProjects();
       setIsModalOpen(false);
       setFormData({ name: "", description: "" });
@@ -62,10 +59,28 @@ export default function Projects() {
       console.error(error);
       const serverMessage = error.response?.data?.errors 
                             ? Object.values(error.response.data.errors).flat().join(", ")
-                            : "Proje oluşturulamadı.";
+                            : "Failed to create project.";
       alert(serverMessage);
     }
   };
+
+  // Proje Silme Fonksiyonu
+  const handleDeleteProject = async (e, projectId) => {
+    e.preventDefault(); // Link'e tıklamayı engelle
+    e.stopPropagation(); // Event'in yukarı taşınmasını engelle
+    
+    if (!window.confirm("Are you sure you want to delete this project? This cannot be undone.")) return;
+
+    try {
+      await projectService.delete(projectId);
+      // Listeden UI olarak çıkar (tekrar fetch yapmaya gerek kalmaz)
+      setProjects(projects.filter(p => p.id !== projectId)); 
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Failed to delete project.");
+    }
+  };
+
   const filteredProjects = projects.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -85,6 +100,7 @@ export default function Projects() {
           <Plus size={20} /> New Project
         </button>
       </div>
+
       <div className="mb-8 relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
         <input 
@@ -95,6 +111,7 @@ export default function Projects() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
       {loading ? (
         <div className="text-center py-20 text-gray-500">Loading projects...</div>
       ) : filteredProjects.length > 0 ? (
@@ -106,6 +123,16 @@ export default function Projects() {
                   <div className="p-2 bg-blue-900/20 rounded-lg text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                     <FolderKanban size={20} />
                   </div>
+                  
+                  {/* SİLME BUTONU */}
+                  <button 
+                    onClick={(e) => handleDeleteProject(e, project.id)}
+                    className="text-gray-500 hover:text-red-500 p-1 hover:bg-gray-700/50 rounded transition-colors z-10"
+                    title="Delete Project"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2 truncate pr-6">{project.name}</h3>
                 <p className="text-gray-400 text-sm line-clamp-2 mb-4 break-words">
@@ -127,6 +154,7 @@ export default function Projects() {
           </button>
         </div>
       )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">

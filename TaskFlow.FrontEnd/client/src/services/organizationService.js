@@ -1,11 +1,16 @@
 import axiosClient from '../api/axiosClient';
+
 const organizationService = {
   create: async (data) => {
     const response = await axiosClient.post('/Organization', data);
     return response.data;
   },
-  getById: async (id) => {
-    const response = await axiosClient.get(`/Organization/${id}`);
+  getCurrent: async () => {
+    const response = await axiosClient.get('/Organization/current');
+    return response.data;
+  },
+  inviteUser: async (email) => {
+    const response = await axiosClient.post('/Organization/invite', { email });
     return response.data;
   }
 };

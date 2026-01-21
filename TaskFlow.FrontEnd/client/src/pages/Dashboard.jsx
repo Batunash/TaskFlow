@@ -26,6 +26,8 @@ export default function Dashboard() {
     try {
       const userData = await userService.getMe();
       setUser(userData);
+      
+      // Check if user has an organization
       if (userData.organizationId) {
         const [projectsData, tasksData] = await Promise.all([
           projectService.getAll(),
@@ -33,8 +35,8 @@ export default function Dashboard() {
         ]);
 
         setStats({
-          projectCount: projectsData.length || 0,
-          taskCount: tasksData.length || 0,
+          projectCount: Array.isArray(projectsData) ? projectsData.length : 0,
+          taskCount: Array.isArray(tasksData) ? tasksData.length : 0,
           userRole: userData.role || "Member"
         });
       }
@@ -44,28 +46,38 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
   const handleCreateOrganization = async (e) => {
     e.preventDefault();
     setCreatingOrg(true);
     
     try {
       const response = await organizationService.create(orgForm);
-      console.log("Organizasyon oluşturuldu, Gelen Cevap:", response);
-      if (response && response.accessToken) {
-        localStorage.setItem("token", response.accessToken);
-        if (response.userName) {
-             localStorage.setItem("user", JSON.stringify({
-                 userId: response.userId,
-                 userName: response.userName,
-                 organizationId: response.organizationId 
-             }));
-        }
+      console.log("Organization created:", response);
+      
+      // Backend handles casing differently sometimes, checking both
+      const token = response.accessToken || response.AccessToken;
+
+      if (token) {
+        // 1. Save new token
+        localStorage.setItem("token", token);
+
+        // 2. Update user info in local storage
+        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+        const updatedUser = {
+            ...currentUser,
+            organizationId: response.organization?.id || response.Organization?.id
+        };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+
         alert("Workspace created successfully! Refreshing session...");
-        setOrgForm({ name: "", description: "" }); 
-        await fetchData(); 
+        setOrgForm({ name: "", description: "" });
+        
+        // 3. Force reload to apply new token to axios client
+        window.location.reload(); 
         
       } else {
-        alert("Organization created. Please login again to update permissions.");
+        alert("Organization created but token was missing. Please login again.");
         navigate("/login");
       }
 
@@ -90,6 +102,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // State: User has NO Organization
   if (!user?.organizationId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 text-white">
@@ -99,9 +113,9 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-blue-900/30 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/20">
               <Building2 className="w-8 h-8 text-blue-400" />
             </div>
-            <h1 className="text-3xl font-bold mb-3">Welcome to TaskFlow, {user?.userName}!</h1>
+            <h1 className="text-3xl font-bold mb-3">Welcome, {user?.userName || "User"}!</h1>
             <p className="text-gray-400 mb-8 text-lg">
-              You are not a member of any organization yet. To start managing projects, you need to create a workspace or wait for an invitation.
+              You are not a member of any organization yet. Create a workspace to start managing projects.
             </p>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-6">
@@ -115,7 +129,7 @@ export default function Dashboard() {
                     <input 
                       type="text" 
                       required
-                      className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                       placeholder="e.g. Acme Corp"
                       value={orgForm.name}
                       onChange={(e) => setOrgForm({...orgForm, name: e.target.value})}
@@ -124,7 +138,7 @@ export default function Dashboard() {
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
                     <textarea 
-                      className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-24 resize-none"
+                      className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all h-24 resize-none"
                       placeholder="What is this team about?"
                       value={orgForm.description}
                       onChange={(e) => setOrgForm({...orgForm, description: e.target.value})}
@@ -146,11 +160,11 @@ export default function Dashboard() {
                 </div>
                 <h3 className="text-xl font-semibold text-white">Joining a team?</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">
-                  If your team already uses TaskFlow, ask your administrator to send you an invitation email. Once invited, the organization will appear here automatically.
+                  Ask your administrator to send you an invitation email. Once invited, the organization will appear here automatically.
                 </p>
                 <div className="pt-4 border-t border-gray-700">
                   <button onClick={handleLogout} className="text-gray-500 hover:text-white text-sm flex items-center gap-2 transition-colors">
-                    <LogOut size={14} /> Not {user?.userName}? Logout
+                    <LogOut size={14} /> Logout
                   </button>
                 </div>
               </div>
@@ -160,6 +174,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // State: User HAS Organization
   return (
     <div className="text-white">
       <header className="mb-8 border-b border-gray-800 pb-6">
@@ -170,14 +186,11 @@ export default function Dashboard() {
           <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-700">
              {stats.userRole}
           </span>
-          {user?.organizationId && (
-             <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded border border-blue-800/50">
-               Org ID: {user.organizationId}
-             </span>
-          )}
         </p>
       </header>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Card 1 */}
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Total Projects</h3>
@@ -186,18 +199,22 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-100">{stats.projectCount}</p>
-          <div className="mt-2 text-xs text-gray-500">Active projects in workspace</div>
+          <div className="mt-2 text-xs text-gray-500">Active projects</div>
         </div>
+        
+        {/* Card 2 */}
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Your Tasks</h3>
+            <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Total Tasks</h3>
             <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors">
               <CheckSquare className="w-5 h-5 text-purple-400" />
             </div>
           </div>
           <p className="text-3xl font-bold text-gray-100">{stats.taskCount}</p>
-          <div className="mt-2 text-xs text-gray-500">Tasks assigned to you</div>
+          <div className="mt-2 text-xs text-gray-500">Tasks in all projects</div>
         </div>
+
+        {/* Card 3 */}
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Workspace</h3>
@@ -206,9 +223,10 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-lg font-bold text-gray-100 truncate">Active</p>
-          <div className="mt-2 text-xs text-gray-500">You are a member</div>
+          <div className="mt-2 text-xs text-gray-500">Organization ID: {user.organizationId}</div>
         </div>
       </div>
+
       {stats.projectCount === 0 && (
         <div className="mt-12 text-center p-12 bg-[#1F2937]/50 rounded-xl border border-dashed border-gray-700">
           <FolderKanban className="w-12 h-12 text-gray-600 mx-auto mb-4" />
