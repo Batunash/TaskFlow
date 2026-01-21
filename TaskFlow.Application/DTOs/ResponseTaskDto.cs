@@ -10,6 +10,7 @@ namespace TaskFlow.Application.DTOs
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
         public int StateId { get; set; }
+        public int ProjectId { get; set; }
         public string StateName { get; set; } = string.Empty;
     }
 }

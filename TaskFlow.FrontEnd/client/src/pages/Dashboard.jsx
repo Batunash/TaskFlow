@@ -33,7 +33,7 @@ export default function Dashboard() {
       if (userData.organizationId) {
         const [projectsData, tasksData] = await Promise.all([
           projectService.getAll(),
-          taskService.getAll({ assignedUserId: userData.id })
+          taskService.getAll({ assignedUserId: userData.userId })
         ]);
 
         const totalTasks = tasksData?.totalCount 

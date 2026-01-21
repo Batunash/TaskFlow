@@ -18,8 +18,10 @@ export default function Tasks() {
   const fetchMyTasks = async () => {
     try {
       const currentUser = await userService.getMe();
+      const userId = currentUser.id || currentUser.userId || currentUser.Id;
+
       const [tasksData, projectsData] = await Promise.all([
-        taskService.getAll({ assignedUserId: currentUser.id }),
+        taskService.getAll({ assignedUserId: userId }), 
         projectService.getAll()
       ]);
 
@@ -35,8 +37,10 @@ export default function Tasks() {
     }
   };
   const getProjectName = (projectId) => {
+    if (!projectId) return "Unknown Project";
     return projects.find(p => p.id === projectId)?.name || "Unknown Project";
   };
+
   const filteredTasks = tasks.filter(task => {
     if (filterPriority === "all") return true;
     return task.priority === parseInt(filterPriority);
