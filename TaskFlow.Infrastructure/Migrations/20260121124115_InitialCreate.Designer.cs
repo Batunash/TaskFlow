@@ -12,7 +12,7 @@ using TaskFlow.Infrastructure.Persistence;
 namespace TaskFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260120094944_InitialCreate")]
+    [Migration("20260121124115_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -97,6 +97,9 @@ namespace TaskFlow.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsAccepted")
+                        .HasColumnType("boolean");
 
                     b.Property<int?>("OrganizationId")
                         .HasColumnType("integer");

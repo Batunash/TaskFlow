@@ -86,6 +86,7 @@ namespace TaskFlow.Infrastructure.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     UserId = table.Column<int>(type: "integer", nullable: false),
+                    IsAccepted = table.Column<bool>(type: "boolean", nullable: false),
                     Role = table.Column<int>(type: "integer", nullable: false),
                     OrganizationId = table.Column<int>(type: "integer", nullable: true)
                 },
