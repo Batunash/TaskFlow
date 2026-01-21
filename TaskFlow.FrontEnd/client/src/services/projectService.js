@@ -34,23 +34,19 @@ const projectService = {
     await axiosClient.delete(`/Project/${id}`);
   },
 
-  addMember: async (projectId, email) => {
-    const payload = {
-      projectId: parseInt(projectId),
-      email: email
-    };
-    const response = await axiosClient.post(`/Project/${projectId}/members`, payload);
-    return response.data;
-  },
-
-  removeMember: async (projectId, userId) => {
-
+ addMember: async (projectId, userId, role = "Member") => {
     const payload = {
         projectId: parseInt(projectId),
-        userId: userId
+        userId: parseInt(userId),
+        role: role
     };
-    await axiosClient.post(`/Project/${projectId}/members/${userId}`, payload);
-  }
+    const response = await axiosClient.post(`/projects/${projectId}/members`, payload);
+    return response.data;
+  },
+  removeMember: async (projectId, userId) => {
+    const response = await axiosClient.delete(`/projects/${projectId}/members/${userId}`);
+    return response.data;
+  },
 };
 
 export default projectService;

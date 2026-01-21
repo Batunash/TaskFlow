@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, ArrowLeft, Settings, Trash2, X } from "lucide-react"; 
+import { Plus, ArrowLeft, Settings, Trash2, X, Pencil, Users, Edit3 } from "lucide-react"; 
 import projectService from "../services/projectService";
 import taskService from "../services/taskService";
 import workflowService from "../services/workflowService";
+import organizationService from "../services/organizationService";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -12,20 +13,19 @@ export default function ProjectDetail() {
   const [states, setStates] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Modals
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: 1 });
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
-  
   const [newStateForm, setNewStateForm] = useState({
-    name: "",
-    previousStateId: "", 
-    isInitial: false,
-    isFinal: false,
-    allowedRoles: ["Admin", "Member"] 
+    name: "", previousStateId: "", isInitial: false, isFinal: false, allowedRoles: ["Admin", "Member"] 
   });
-
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [orgMembers, setOrgMembers] = useState([]); 
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
+  const [projectForm, setProjectForm] = useState({ name: "", description: "" });
   useEffect(() => {
     fetchProjectData();
   }, [id]);
@@ -41,13 +41,9 @@ export default function ProjectDetail() {
       setProject(projectData);
       setStates(statesData || []);
 
-      // Mapping: Backend verisini Frontend'e uydur
       const mappedTasks = (tasksData || []).map(task => ({
         ...task,
-        // Backend 'stateId' veya 'StateId' gönderebilir
         workflowStateId: task.stateId || task.StateId || task.workflowStateId,
-        
-        // Eksik alanlar için varsayılanlar
         description: task.description || task.Description || "", 
         priority: task.priority !== undefined ? task.priority : 1 
       }));
@@ -59,14 +55,12 @@ export default function ProjectDetail() {
       setLoading(false);
     }
   };
-
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
       const initialState = states.find(s => s.isInitial);
-      
       if (!initialState) {
-        alert("No 'Initial State' defined in this project. Please add a column and mark it as 'Initial State'.");
+        alert("No 'Initial State' defined. Please add a column and mark it as 'Initial State'.");
         return;
       }
 
@@ -97,27 +91,90 @@ export default function ProjectDetail() {
     }
   };
 
-  // Sütun Silme Fonksiyonu
-  const handleDeleteState = async (stateId) => {
-    if(!window.confirm("Are you sure you want to delete this column? Tasks in it might be lost.")) return;
+  const openEditModal = (task) => {
+    setEditingTask({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      assignedUserId: task.assignedUserId || ""
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
     try {
-        await workflowService.removeState(id, stateId); 
-        fetchProjectData();
+      if (!editingTask) return;
+      await taskService.update(editingTask.id, {
+        title: editingTask.title,
+        description: editingTask.description,
+        priority: parseInt(editingTask.priority)
+      });
+      const originalTask = tasks.find(t => t.id === editingTask.id);
+      if (editingTask.assignedUserId && editingTask.assignedUserId != originalTask.assignedUserId) {
+          await taskService.assign(editingTask.id, parseInt(editingTask.assignedUserId));
+      }
+
+      await fetchProjectData();
+      setIsEditModalOpen(false);
+      setEditingTask(null);
     } catch (error) {
-        console.error("State delete error:", error);
-        alert("Failed to delete column. Ensure it's not being used properly.");
+      console.error("Update/Assign error:", error);
+      alert("Failed to update task.");
     }
   };
 
   const handleStatusChange = async (taskId, newStateId) => {
       try {
-          // Servise TargetStateId olarak gidecek
           await taskService.changeStatus(taskId, newStateId);
           fetchProjectData();
       } catch (error) {
           console.error("Status change error:", error);
           alert("Failed to change status.");
       }
+  };
+  const handleDeleteState = async (stateId) => {
+    const stateToDelete = states.find(s => s.id === stateId);
+    if (stateToDelete?.isInitial) {
+        alert("The 'Initial State' cannot be deleted.");
+        return;
+    }
+
+    const tasksInColumn = tasks.filter(t => t.workflowStateId === stateId);
+    let confirmMessage = tasksInColumn.length > 0
+        ? `WARNING: This column contains ${tasksInColumn.length} tasks! Deleting it will PERMANENTLY delete these tasks. Are you sure?`
+        : "Are you sure you want to delete this column?";
+
+    if(!window.confirm(confirmMessage)) return;
+
+    try {
+        if (tasksInColumn.length > 0) {
+            await Promise.all(tasksInColumn.map(task => taskService.delete(task.id)));
+        }
+        try {
+            if (workflowService.getWorkflow) {
+                const workflowData = await workflowService.getWorkflow(id);
+                if(workflowData?.transitions) {
+                    const relatedTransitions = workflowData.transitions.filter(
+                        t => t.fromStateId === stateId || t.toStateId === stateId
+                    );
+                    if (relatedTransitions.length > 0) {
+                        await Promise.all(relatedTransitions.map(t => 
+                            workflowService.removeTransition(id, t.id)
+                        ));
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Transition cleanup skipped:", e);
+        }
+        await workflowService.removeState(id, stateId); 
+        fetchProjectData();
+    } catch (error) {
+        console.error("State delete error:", error);
+        alert("Failed to delete column.");
+    }
   };
 
   const handleAddState = async (e) => {
@@ -142,13 +199,8 @@ export default function ProjectDetail() {
       await fetchProjectData();
       setIsStateModalOpen(false);
       setNewStateForm({ 
-        name: "", 
-        previousStateId: "", 
-        isInitial: false, 
-        isFinal: false,
-        allowedRoles: ["Admin", "Member"] 
+        name: "", previousStateId: "", isInitial: false, isFinal: false, allowedRoles: ["Admin", "Member"] 
       });
-
     } catch (error) {
       console.error(error);
       alert("Failed to add column.");
@@ -163,24 +215,112 @@ export default function ProjectDetail() {
       return { ...prev, allowedRoles: roles };
     });
   };
+  const openMemberModal = async () => {
+    setIsMemberModalOpen(true);
+    try {
+        if (project?.organizationId) {
+            const members = await organizationService.getMembers(project.organizationId);
+            setOrgMembers(members || []);
+        }
+    } catch (error) {
+        console.error("Failed to fetch org members:", error);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedMemberId) return;
+    try {
+        await projectService.addMember(id, selectedMemberId, "Member");
+        await fetchProjectData(); 
+        setSelectedMemberId("");
+        alert("Member added successfully!");
+    } catch (error) {
+        console.error("Add member error:", error);
+        alert("Failed to add member.");
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    if(!window.confirm("Are you sure you want to remove this member?")) return;
+    try {
+        await projectService.removeMember(id, userId);
+        await fetchProjectData(); 
+    } catch (error) {
+        console.error("Remove member error:", error);
+        alert("Failed to remove member.");
+    }
+  };
+  const openProjectSettings = () => {
+    setProjectForm({
+        name: project.name,
+        description: project.description
+    });
+    setIsProjectSettingsOpen(true);
+  };
+
+  const handleUpdateProject = async (e) => {
+    e.preventDefault();
+    try {
+        await projectService.update(id, projectForm);
+        setProject({ ...project, ...projectForm });
+        setIsProjectSettingsOpen(false);
+        alert("Project updated successfully!");
+    } catch (error) {
+        console.error("Update project error:", error);
+        alert("Failed to update project.");
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const confirmName = window.prompt(`To delete this project, type its name "${project.name}":`);
+    
+    if (confirmName !== project.name) {
+        if(confirmName !== null) alert("Project name didn't match. Deletion cancelled.");
+        return;
+    }
+
+    try {
+        await projectService.delete(id);
+        alert("Project deleted.");
+        navigate("/projects");
+    } catch (error) {
+        console.error("Delete project error:", error);
+        alert("Failed to delete project.");
+    }
+  };
+
 
   if (loading) return <div className="text-white text-center mt-20">Loading...</div>;
 
   return (
     <div className="h-full flex flex-col text-white">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6 border-b border-gray-700 pb-4">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate("/projects")} className="p-2 hover:bg-gray-800 rounded-lg">
             <ArrowLeft size={20} className="text-gray-400" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold">{project?.name}</h1>
+            <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold">{project?.name}</h1>
+                <button 
+                    onClick={openProjectSettings}
+                    className="text-gray-500 hover:text-white transition-colors"
+                    title="Project Settings"
+                >
+                    <Edit3 size={18} />
+                </button>
+            </div>
             <p className="text-gray-400 text-sm">{project?.description}</p>
           </div>
         </div>
         
         <div className="flex gap-3">
+          <button 
+            onClick={openMemberModal}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
+          >
+            <Users size={18} /> Members
+          </button>
           <button 
             onClick={() => setIsStateModalOpen(true)}
             className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
@@ -195,8 +335,6 @@ export default function ProjectDetail() {
           </button>
         </div>
       </div>
-
-      {/* Board Area */}
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-6 h-full min-w-max pb-4 px-2">
           {states.map((state) => (
@@ -210,7 +348,6 @@ export default function ProjectDetail() {
                     <span className="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded-full border border-gray-700">
                       {tasks.filter(t => t.workflowStateId === state.id).length}
                     </span>
-                    {/* SÜTUN SİLME BUTONU */}
                     <button 
                         onClick={() => handleDeleteState(state.id)}
                         className="text-gray-600 hover:text-red-500 opacity-0 group-hover/column:opacity-100 transition-opacity"
@@ -220,40 +357,49 @@ export default function ProjectDetail() {
                     </button>
                 </div>
               </div>
-              
-              {/* Task List */}
               <div className="bg-[#1F2937]/50 rounded-xl p-3 flex-1 border border-gray-800/50 min-h-[200px] space-y-3">
-                {tasks.filter(t => t.workflowStateId === state.id).map(task => (
-                    <div key={task.id} className="bg-[#1F2937] p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 shadow-sm group relative">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className={`text-xs px-2 py-0.5 rounded ${task.priority === 2 ? 'bg-red-900/30 text-red-400' : task.priority === 1 ? 'bg-blue-900/30 text-blue-400' : 'bg-gray-700 text-gray-300'}`}>
-                          {task.priority === 2 ? 'High' : task.priority === 1 ? 'Medium' : 'Low'}
-                        </span>
-                        <button 
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="text-gray-600 hover:text-red-400 transition-colors"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                      </div>
-                      <h4 className="font-medium text-gray-200 mb-1">{task.title}</h4>
-                      <p className="text-xs text-gray-500 mb-3 line-clamp-2">{task.description}</p>
-                      
-                      {/* Status Changer */}
-                      <div className="pt-3 border-t border-gray-700/50 flex items-center justify-between gap-2">
-                         <span className="text-xs text-gray-500">#{task.id}</span>
-                         <select 
-                            className="bg-[#111827] text-xs text-gray-300 border border-gray-600 rounded px-1 py-1 outline-none focus:border-blue-500 max-w-[120px]"
-                            value={task.workflowStateId}
-                            onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                         >
-                             {states.map(s => (
-                                 <option key={s.id} value={s.id}>{s.name}</option>
-                             ))}
-                         </select>
-                      </div>
-                    </div>
-                  ))}
+                {tasks.filter(t => t.workflowStateId === state.id).map(task => {
+                    const assignedMember = project?.members?.find(m => m.id === task.assignedUserId);
+                    return (
+                        <div key={task.id} className="bg-[#1F2937] p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 shadow-sm group relative">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className={`text-xs px-2 py-0.5 rounded ${task.priority === 2 ? 'bg-red-900/30 text-red-400' : task.priority === 1 ? 'bg-blue-900/30 text-blue-400' : 'bg-gray-700 text-gray-300'}`}>
+                              {task.priority === 2 ? 'High' : task.priority === 1 ? 'Medium' : 'Low'}
+                            </span>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEditModal(task)} className="text-gray-600 hover:text-blue-400 transition-colors">
+                                    <Pencil size={14} />
+                                </button>
+                                <button onClick={() => handleDeleteTask(task.id)} className="text-gray-600 hover:text-red-400 transition-colors">
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                          </div>
+                          
+                          <h4 className="font-medium text-gray-200 mb-1">{task.title}</h4>
+                          <p className="text-xs text-gray-500 mb-3 line-clamp-2">{task.description}</p>
+                          
+                          {assignedMember && (
+                             <div className="mb-2">
+                                <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                                   👤 {assignedMember.username || assignedMember.email || "Assigned"}
+                                </span>
+                             </div>
+                          )}
+
+                          <div className="pt-3 border-t border-gray-700/50 flex items-center justify-between gap-2">
+                             <span className="text-xs text-gray-500">#{task.id}</span>
+                             <select 
+                                className="bg-[#111827] text-xs text-gray-300 border border-gray-600 rounded px-1 py-1 outline-none focus:border-blue-500 max-w-[120px]"
+                                value={task.workflowStateId}
+                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                             >
+                                 {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                             </select>
+                          </div>
+                        </div>
+                    );
+                })}
               </div>
             </div>
           ))}
@@ -266,8 +412,71 @@ export default function ProjectDetail() {
           )}
         </div>
       </div>
+      {isMemberModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl p-6 relative">
+            <button onClick={() => setIsMemberModalOpen(false)} className="absolute right-4 top-4 text-gray-400 hover:text-white">
+                <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <Users size={20} className="text-blue-400"/> Project Members
+            </h3>
+            
+            <div className="mb-6">
+                <h4 className="text-sm text-gray-400 mb-3 uppercase font-semibold">Current Team</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                    {project?.members?.map(member => (
+                        <div key={member.id} className="flex justify-between items-center bg-[#111827] p-3 rounded-lg border border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center text-blue-200 text-xs font-bold border border-blue-500/30">
+                                    {member.username?.[0]?.toUpperCase() || "U"}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-200">{member.username}</p>
+                                    <p className="text-xs text-gray-500">{member.email}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => handleRemoveMember(member.id)} className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors">
+                                <X size={16} />
+                            </button>
+                        </div>
+                    ))}
+                    {(!project?.members || project.members.length === 0) && (
+                        <p className="text-gray-500 text-sm italic">No members yet.</p>
+                    )}
+                </div>
+            </div>
 
-      {/* Add Column Modal */}
+            <div className="pt-6 border-t border-gray-700">
+                <h4 className="text-sm text-gray-400 mb-3 uppercase font-semibold">Add New Member</h4>
+                <div className="flex gap-2">
+                    <select 
+                        className="flex-1 bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 text-sm"
+                        value={selectedMemberId}
+                        onChange={(e) => setSelectedMemberId(e.target.value)}
+                    >
+                        <option value="">-- Select from Organization --</option>
+                        {orgMembers
+                            .filter(orgMember => !project?.members?.some(pm => pm.id === orgMember.id))
+                            .map(m => (
+                                <option key={m.id} value={m.id}>{m.username} ({m.email})</option>
+                        ))}
+                    </select>
+                    <button 
+                        onClick={handleAddMember}
+                        disabled={!selectedMemberId}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                    >
+                        Add
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                    * Only users who are already in your Organization can be added.
+                </p>
+            </div>
+          </div>
+        </div>
+      )}
       {isStateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
@@ -275,87 +484,39 @@ export default function ProjectDetail() {
                 <X size={20} />
             </button>
             <h3 className="text-xl font-bold mb-6">Add New Column</h3>
-            
             <form onSubmit={handleAddState} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Column Name</label>
-                <input 
-                  type="text" required
-                  placeholder="e.g. Backlog, Testing"
+                <input type="text" required placeholder="e.g. Backlog"
                   className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
-                  value={newStateForm.name}
-                  onChange={(e) => setNewStateForm({...newStateForm, name: e.target.value})}
+                  value={newStateForm.name} onChange={(e) => setNewStateForm({...newStateForm, name: e.target.value})}
                 />
               </div>
-
               <div className="flex gap-6">
                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-600 bg-[#111827] text-blue-600 w-4 h-4"
-                      checked={newStateForm.isInitial}
-                      onChange={(e) => setNewStateForm({...newStateForm, isInitial: e.target.checked})}
-                    />
-                    <span className="text-sm text-gray-300">Is Initial State?</span>
+                    <input type="checkbox" className="rounded border-gray-600 bg-[#111827] text-blue-600 w-4 h-4"
+                      checked={newStateForm.isInitial} onChange={(e) => setNewStateForm({...newStateForm, isInitial: e.target.checked})} />
+                    <span className="text-sm text-gray-300">Is Initial?</span>
                  </label>
                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-600 bg-[#111827] text-blue-600 w-4 h-4"
-                      checked={newStateForm.isFinal}
-                      onChange={(e) => setNewStateForm({...newStateForm, isFinal: e.target.checked})}
-                    />
-                    <span className="text-sm text-gray-300">Is Final State?</span>
+                    <input type="checkbox" className="rounded border-gray-600 bg-[#111827] text-blue-600 w-4 h-4"
+                      checked={newStateForm.isFinal} onChange={(e) => setNewStateForm({...newStateForm, isFinal: e.target.checked})} />
+                    <span className="text-sm text-gray-300">Is Final?</span>
                  </label>
               </div>
-
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Transition from...</label>
-                <select 
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
-                  value={newStateForm.previousStateId}
-                  onChange={(e) => setNewStateForm({...newStateForm, previousStateId: e.target.value})}
-                >
-                  <option value="">-- Independent / Start --</option>
-                  {states.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                <select className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                  value={newStateForm.previousStateId} onChange={(e) => setNewStateForm({...newStateForm, previousStateId: e.target.value})}>
+                  <option value="">-- Independent --</option>
+                  {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Who can move tasks here?</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={newStateForm.allowedRoles.includes("Admin")}
-                      onChange={() => handleRoleChange("Admin")}
-                      className="rounded border-gray-600 bg-[#111827] text-blue-600"
-                    />
-                    <span className="text-sm">Admin</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={newStateForm.allowedRoles.includes("Member")}
-                      onChange={() => handleRoleChange("Member")}
-                      className="rounded border-gray-600 bg-[#111827] text-blue-600"
-                    />
-                    <span className="text-sm">Member</span>
-                  </label>
-                </div>
-              </div>
-              
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium mt-4">
-                Create Column
-              </button>
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium mt-4">Create Column</button>
             </form>
           </div>
         </div>
       )}
-
-      {/* Add Task Modal */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
@@ -366,40 +527,122 @@ export default function ProjectDetail() {
             <form onSubmit={handleCreateTask} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Title</label>
-                <input 
-                  type="text" required
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                />
+                <input type="text" required className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                  value={newTask.title} onChange={(e) => setNewTask({...newTask, title: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Description</label>
-                <textarea 
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 h-24 resize-none"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                />
+                <textarea className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 h-24 resize-none"
+                  value={newTask.description} onChange={(e) => setNewTask({...newTask, description: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Priority</label>
-                <select 
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
-                  value={newTask.priority}
-                  onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
-                >
+                <select className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                  value={newTask.priority} onChange={(e) => setNewTask({...newTask, priority: e.target.value})}>
                   <option value="0">Low</option>
                   <option value="1">Medium</option>
                   <option value="2">High</option>
                 </select>
               </div>
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">
-                Create Task
-              </button>
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">Create Task</button>
             </form>
           </div>
         </div>
       )}
+      {isEditModalOpen && editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
+            <button onClick={() => setIsEditModalOpen(false)} className="absolute right-4 top-4 text-gray-400 hover:text-white">
+                <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-6">Edit Task</h3>
+            <form onSubmit={handleUpdateTask} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Title</label>
+                <input type="text" required className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                  value={editingTask.title} onChange={(e) => setEditingTask({...editingTask, title: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                <textarea className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 h-24 resize-none"
+                  value={editingTask.description} onChange={(e) => setEditingTask({...editingTask, description: e.target.value})} />
+              </div>
+              <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm text-gray-400 mb-1">Priority</label>
+                    <select className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                      value={editingTask.priority} onChange={(e) => setEditingTask({...editingTask, priority: e.target.value})}>
+                      <option value="0">Low</option>
+                      <option value="1">Medium</option>
+                      <option value="2">High</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm text-gray-400 mb-1">Assign To</label>
+                    <select className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                      value={editingTask.assignedUserId} onChange={(e) => setEditingTask({...editingTask, assignedUserId: e.target.value})}>
+                      <option value="">-- Unassigned --</option>
+                      {project?.members?.map(member => (
+                        <option key={member.id} value={member.id}>{member.username || `User ${member.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium">Cancel</button>
+                  <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isProjectSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
+            <button onClick={() => setIsProjectSettingsOpen(false)} className="absolute right-4 top-4 text-gray-400 hover:text-white">
+                <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-6">Project Settings</h3>
+            
+            <form onSubmit={handleUpdateProject} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Project Name</label>
+                <input 
+                  type="text" required
+                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                  value={projectForm.name}
+                  onChange={(e) => setProjectForm({...projectForm, name: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                <textarea 
+                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 h-20 resize-none"
+                  value={projectForm.description}
+                  onChange={(e) => setProjectForm({...projectForm, description: e.target.value})}
+                />
+              </div>
+              
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">
+                Save Changes
+              </button>
+            </form>
+            <div className="mt-8 pt-6 border-t border-gray-700">
+                <h4 className="text-red-400 font-bold text-sm mb-2 uppercase">Danger Zone</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                    Once you delete a project, there is no going back. All tasks and columns will be lost.
+                </p>
+                <button 
+                    onClick={handleDeleteProject}
+                    className="w-full border border-red-900/50 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-2 rounded-lg font-medium text-sm transition-colors"
+                >
+                    Delete Project
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

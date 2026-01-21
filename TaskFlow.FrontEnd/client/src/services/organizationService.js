@@ -12,7 +12,11 @@ const organizationService = {
   inviteUser: async (email) => {
     const response = await axiosClient.post('/Organization/invite', { email });
     return response.data;
-  }
+  },
+  getMembers: async (orgId) => {
+    const response = await axiosClient.get(`/organizations/${orgId}/members`);
+    return response.data;
+  },
 };
 
 export default organizationService;

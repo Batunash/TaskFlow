@@ -39,12 +39,9 @@ export default function Projects() {
     }
 
     try {
-      // 1. Projeyi oluştur
       const newProject = await projectService.create(formData);
-
       if (newProject && newProject.id) {
         try {
-          // 2. Boş bir workflow oluştur (Default stateler yok, kullanıcı ekleyecek)
           await workflowService.create(newProject.id);
         } catch (wfError) {
           console.error("Workflow initialization error:", wfError);
@@ -63,17 +60,14 @@ export default function Projects() {
       alert(serverMessage);
     }
   };
-
-  // Proje Silme Fonksiyonu
   const handleDeleteProject = async (e, projectId) => {
-    e.preventDefault(); // Link'e tıklamayı engelle
-    e.stopPropagation(); // Event'in yukarı taşınmasını engelle
+    e.preventDefault(); 
+    e.stopPropagation(); 
     
     if (!window.confirm("Are you sure you want to delete this project? This cannot be undone.")) return;
 
     try {
       await projectService.delete(projectId);
-      // Listeden UI olarak çıkar (tekrar fetch yapmaya gerek kalmaz)
       setProjects(projects.filter(p => p.id !== projectId)); 
     } catch (error) {
       console.error("Delete failed:", error);
@@ -123,8 +117,6 @@ export default function Projects() {
                   <div className="p-2 bg-blue-900/20 rounded-lg text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                     <FolderKanban size={20} />
                   </div>
-                  
-                  {/* SİLME BUTONU */}
                   <button 
                     onClick={(e) => handleDeleteProject(e, project.id)}
                     className="text-gray-500 hover:text-red-500 p-1 hover:bg-gray-700/50 rounded transition-colors z-10"

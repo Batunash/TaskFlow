@@ -26,8 +26,6 @@ export default function Dashboard() {
     try {
       const userData = await userService.getMe();
       setUser(userData);
-      
-      // Check if user has an organization
       if (userData.organizationId) {
         const [projectsData, tasksData] = await Promise.all([
           projectService.getAll(),
@@ -54,15 +52,10 @@ export default function Dashboard() {
     try {
       const response = await organizationService.create(orgForm);
       console.log("Organization created:", response);
-      
-      // Backend handles casing differently sometimes, checking both
       const token = response.accessToken || response.AccessToken;
 
       if (token) {
-        // 1. Save new token
         localStorage.setItem("token", token);
-
-        // 2. Update user info in local storage
         const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
         const updatedUser = {
             ...currentUser,
@@ -71,9 +64,7 @@ export default function Dashboard() {
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
         alert("Workspace created successfully! Refreshing session...");
-        setOrgForm({ name: "", description: "" });
-        
-        // 3. Force reload to apply new token to axios client
+        setOrgForm({ name: "", description: "" });        
         window.location.reload(); 
         
       } else {
@@ -102,8 +93,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  // State: User has NO Organization
   if (!user?.organizationId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 text-white">
@@ -175,7 +164,6 @@ export default function Dashboard() {
     );
   }
 
-  // State: User HAS Organization
   return (
     <div className="text-white">
       <header className="mb-8 border-b border-gray-800 pb-6">
@@ -190,7 +178,6 @@ export default function Dashboard() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1 */}
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Total Projects</h3>
@@ -200,9 +187,7 @@ export default function Dashboard() {
           </div>
           <p className="text-3xl font-bold text-gray-100">{stats.projectCount}</p>
           <div className="mt-2 text-xs text-gray-500">Active projects</div>
-        </div>
-        
-        {/* Card 2 */}
+        </div>        
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Total Tasks</h3>
@@ -213,8 +198,6 @@ export default function Dashboard() {
           <p className="text-3xl font-bold text-gray-100">{stats.taskCount}</p>
           <div className="mt-2 text-xs text-gray-500">Tasks in all projects</div>
         </div>
-
-        {/* Card 3 */}
         <div className="bg-[#1F2937] p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors shadow-sm group">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Workspace</h3>

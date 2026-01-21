@@ -27,7 +27,11 @@ const workflowService = {
 
   removeTransition: async (projectId, transitionId) => {
     await axiosClient.delete(`/projects/${projectId}/workflow/transitions/${transitionId}`);
-  }
+  },
+  getWorkflow: async (projectId) => {
+    const response = await axiosClient.get(`/projects/${projectId}/workflow`);
+    return response.data; 
+  },
 };
 
 export default workflowService;

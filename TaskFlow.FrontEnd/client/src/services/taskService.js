@@ -43,7 +43,14 @@ const taskService = {
     };
     const response = await axiosClient.post('/task/status', payload);
     return response.data;
-  }
+  },
+ update: async (taskId, taskData) => {
+    const response = await axiosClient.put('/task', {
+        id: taskId,       
+        ...taskData       
+    });
+    return response.data;
+  },
 };
 
 export default taskService;
