@@ -58,6 +58,12 @@ namespace TaskFlow.API.Controllers
             var result = await organizationService.GetMyInvitationsAsync(userId);
             return Ok(result);
         }
+        [HttpGet("{organizationId}/members")]
+        public async Task<IActionResult> GetMembers(int organizationId)
+        {
+            var result = await organizationService.GetMembersAsync(organizationId);
+            return Ok(result);
+        }
 
     }
 }

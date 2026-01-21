@@ -14,6 +14,7 @@ namespace TaskFlow.Application.Interfaces
         Task InviteAsync(InviteUserDto dto, int currentUserId);
         Task AcceptInvitationAsync(int organizationId, int currentUserId);
         Task<List<OrganizationInvitationDto>> GetMyInvitationsAsync(int currentUserId);
+        Task<List<UserDto>> GetMembersAsync(int organizationId);
     }
 
 }

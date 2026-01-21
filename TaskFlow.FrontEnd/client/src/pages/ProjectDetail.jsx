@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, ArrowLeft, Settings, Trash2, X, Pencil, Users, Edit3 } from "lucide-react"; 
+import { Plus, ArrowLeft, Settings, Trash2, X, Pencil, Users, Edit3, Search, Filter } from "lucide-react"; 
 import projectService from "../services/projectService";
 import taskService from "../services/taskService";
 import workflowService from "../services/workflowService";
@@ -12,7 +12,13 @@ export default function ProjectDetail() {
   const [project, setProject] = useState(null);
   const [states, setStates] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [orgMembers, setOrgMembers] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    keyword: "",
+    assignedUserId: "",
+    priority: "all"
+  });
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: 1 });
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
@@ -22,26 +28,49 @@ export default function ProjectDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [orgMembers, setOrgMembers] = useState([]); 
-  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");  
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: "", description: "" });
   useEffect(() => {
-    fetchProjectData();
+    fetchInitialData();
   }, [id]);
+  useEffect(() => {
+    if (!loading) {
+      fetchTasks();
+    }
+  }, [filters.assignedUserId]);
 
-  const fetchProjectData = async () => {
+  const fetchInitialData = async () => {
     try {
-      const [projectData, statesData, tasksData] = await Promise.all([
+      const [projectData, statesData] = await Promise.all([
         projectService.getById(id),
-        workflowService.getProjectStates(id),
-        taskService.getByProjectId(id)
+        workflowService.getProjectStates(id)
       ]);
 
       setProject(projectData);
       setStates(statesData || []);
+      await fetchTasks();
+      
+    } catch (error) {
+      console.error("Failed to load project data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const mappedTasks = (tasksData || []).map(task => ({
+  const fetchTasks = async () => {
+    try {
+      const query = {
+        projectId: parseInt(id),
+        pageSize: 1000, 
+      };
+
+      if (filters.assignedUserId) {
+        query.assignedUserId = parseInt(filters.assignedUserId);
+      }
+      const result = await taskService.getAll(query);      
+      const rawTasks = result.items || result.Items || (Array.isArray(result) ? result : []);
+      const mappedTasks = rawTasks.map(task => ({
         ...task,
         workflowStateId: task.stateId || task.StateId || task.workflowStateId,
         description: task.description || task.Description || "", 
@@ -50,11 +79,20 @@ export default function ProjectDetail() {
 
       setTasks(mappedTasks);
     } catch (error) {
-      console.error("Failed to load data:", error);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch tasks:", error);
     }
   };
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const matchesKeyword = filters.keyword === "" || 
+        task.title.toLowerCase().includes(filters.keyword.toLowerCase()) ||
+        task.description.toLowerCase().includes(filters.keyword.toLowerCase());
+      const matchesPriority = filters.priority === "all" || 
+        task.priority === parseInt(filters.priority);
+
+      return matchesKeyword && matchesPriority;
+    });
+  }, [tasks, filters.keyword, filters.priority]);
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
@@ -73,7 +111,7 @@ export default function ProjectDetail() {
       
       setIsTaskModalOpen(false);
       setNewTask({ title: "", description: "", priority: 1 });
-      fetchProjectData();
+      fetchTasks();
     } catch (error) {
       console.error(error);
       alert("Failed to create task.");
@@ -84,7 +122,7 @@ export default function ProjectDetail() {
     if(!window.confirm("Are you sure you want to delete this task?")) return;
     try {
         await taskService.delete(taskId);
-        fetchProjectData();
+        fetchTasks();
     } catch (error) {
         console.error("Delete error:", error);
         alert("Failed to delete task.");
@@ -116,7 +154,7 @@ export default function ProjectDetail() {
           await taskService.assign(editingTask.id, parseInt(editingTask.assignedUserId));
       }
 
-      await fetchProjectData();
+      await fetchTasks();
       setIsEditModalOpen(false);
       setEditingTask(null);
     } catch (error) {
@@ -128,12 +166,13 @@ export default function ProjectDetail() {
   const handleStatusChange = async (taskId, newStateId) => {
       try {
           await taskService.changeStatus(taskId, newStateId);
-          fetchProjectData();
+          fetchTasks();
       } catch (error) {
           console.error("Status change error:", error);
           alert("Failed to change status.");
       }
   };
+
   const handleDeleteState = async (stateId) => {
     const stateToDelete = states.find(s => s.id === stateId);
     if (stateToDelete?.isInitial) {
@@ -152,25 +191,10 @@ export default function ProjectDetail() {
         if (tasksInColumn.length > 0) {
             await Promise.all(tasksInColumn.map(task => taskService.delete(task.id)));
         }
-        try {
-            if (workflowService.getWorkflow) {
-                const workflowData = await workflowService.getWorkflow(id);
-                if(workflowData?.transitions) {
-                    const relatedTransitions = workflowData.transitions.filter(
-                        t => t.fromStateId === stateId || t.toStateId === stateId
-                    );
-                    if (relatedTransitions.length > 0) {
-                        await Promise.all(relatedTransitions.map(t => 
-                            workflowService.removeTransition(id, t.id)
-                        ));
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn("Transition cleanup skipped:", e);
-        }
         await workflowService.removeState(id, stateId); 
-        fetchProjectData();
+        const updatedStates = await workflowService.getProjectStates(id);
+        setStates(updatedStates || []);
+        fetchTasks();
     } catch (error) {
         console.error("State delete error:", error);
         alert("Failed to delete column.");
@@ -196,7 +220,8 @@ export default function ProjectDetail() {
         });
       }
       
-      await fetchProjectData();
+      const updatedStates = await workflowService.getProjectStates(id);
+      setStates(updatedStates || []);
       setIsStateModalOpen(false);
       setNewStateForm({ 
         name: "", previousStateId: "", isInitial: false, isFinal: false, allowedRoles: ["Admin", "Member"] 
@@ -207,14 +232,6 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleRoleChange = (role) => {
-    setNewStateForm(prev => {
-      const roles = prev.allowedRoles.includes(role)
-        ? prev.allowedRoles.filter(r => r !== role)
-        : [...prev.allowedRoles, role];
-      return { ...prev, allowedRoles: roles };
-    });
-  };
   const openMemberModal = async () => {
     setIsMemberModalOpen(true);
     try {
@@ -231,7 +248,8 @@ export default function ProjectDetail() {
     if (!selectedMemberId) return;
     try {
         await projectService.addMember(id, selectedMemberId, "Member");
-        await fetchProjectData(); 
+        const pData = await projectService.getById(id);
+        setProject(pData);
         setSelectedMemberId("");
         alert("Member added successfully!");
     } catch (error) {
@@ -244,12 +262,14 @@ export default function ProjectDetail() {
     if(!window.confirm("Are you sure you want to remove this member?")) return;
     try {
         await projectService.removeMember(id, userId);
-        await fetchProjectData(); 
+        const pData = await projectService.getById(id);
+        setProject(pData);
     } catch (error) {
         console.error("Remove member error:", error);
         alert("Failed to remove member.");
     }
   };
+
   const openProjectSettings = () => {
     setProjectForm({
         name: project.name,
@@ -273,12 +293,10 @@ export default function ProjectDetail() {
 
   const handleDeleteProject = async () => {
     const confirmName = window.prompt(`To delete this project, type its name "${project.name}":`);
-    
     if (confirmName !== project.name) {
         if(confirmName !== null) alert("Project name didn't match. Deletion cancelled.");
         return;
     }
-
     try {
         await projectService.delete(id);
         alert("Project deleted.");
@@ -294,115 +312,173 @@ export default function ProjectDetail() {
 
   return (
     <div className="h-full flex flex-col text-white">
-      <div className="flex items-center justify-between mb-6 border-b border-gray-700 pb-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/projects")} className="p-2 hover:bg-gray-800 rounded-lg">
-            <ArrowLeft size={20} className="text-gray-400" />
-          </button>
-          <div>
-            <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{project?.name}</h1>
+      <div className="flex flex-col gap-4 mb-6 border-b border-gray-700 pb-4">
+        <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+            <button onClick={() => navigate("/projects")} className="p-2 hover:bg-gray-800 rounded-lg">
+                <ArrowLeft size={20} className="text-gray-400" />
+            </button>
+            <div>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold">{project?.name}</h1>
+                    <button 
+                        onClick={openProjectSettings}
+                        className="text-gray-500 hover:text-white transition-colors"
+                        title="Project Settings"
+                    >
+                        <Edit3 size={18} />
+                    </button>
+                </div>
+                <p className="text-gray-400 text-sm">{project?.description}</p>
+            </div>
+            </div>
+            
+            <div className="flex gap-3">
                 <button 
-                    onClick={openProjectSettings}
-                    className="text-gray-500 hover:text-white transition-colors"
-                    title="Project Settings"
+                    onClick={openMemberModal}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
                 >
-                    <Edit3 size={18} />
+                    <Users size={18} /> Members
+                </button>
+                <button 
+                    onClick={() => setIsStateModalOpen(true)}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
+                >
+                    <Settings size={18} /> Add Column
+                </button>
+                <button 
+                    onClick={() => setIsTaskModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+                >
+                    <Plus size={18} /> New Task
                 </button>
             </div>
-            <p className="text-gray-400 text-sm">{project?.description}</p>
-          </div>
         </div>
-        
-        <div className="flex gap-3">
-          <button 
-            onClick={openMemberModal}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
-          >
-            <Users size={18} /> Members
-          </button>
-          <button 
-            onClick={() => setIsStateModalOpen(true)}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-600 transition-colors"
-          >
-            <Settings size={18} /> Add Column
-          </button>
-          <button 
-            onClick={() => setIsTaskModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-          >
-            <Plus size={18} /> New Task
-          </button>
+        <div className="flex flex-wrap items-center gap-3 bg-[#1F2937] p-3 rounded-xl border border-gray-700">
+            <div className="flex items-center gap-2 text-gray-400 mr-2">
+                <Filter size={16} />
+                <span className="text-sm font-medium">Filters:</span>
+            </div>
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                <input 
+                    type="text" 
+                    placeholder="Search task..." 
+                    className="bg-[#111827] border border-gray-600 rounded-lg py-1.5 pl-9 pr-3 text-sm text-gray-200 outline-none focus:border-blue-500 w-48 transition-all"
+                    value={filters.keyword}
+                    onChange={(e) => setFilters({...filters, keyword: e.target.value})}
+                />
+            </div>
+            <select 
+                className="bg-[#111827] border border-gray-600 rounded-lg py-1.5 px-3 text-sm text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
+                value={filters.assignedUserId}
+                onChange={(e) => setFilters({...filters, assignedUserId: e.target.value})}
+            >
+                <option value="">All Assignees</option>
+                {project?.members?.map(m => (
+                    <option key={m.id} value={m.id}>{m.username}</option>
+                ))}
+            </select>
+            <select 
+                className="bg-[#111827] border border-gray-600 rounded-lg py-1.5 px-3 text-sm text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
+                value={filters.priority}
+                onChange={(e) => setFilters({...filters, priority: e.target.value})}
+            >
+                <option value="all">All Priorities</option>
+                <option value="2">High Priority</option>
+                <option value="1">Medium Priority</option>
+                <option value="0">Low Priority</option>
+            </select>
+            {(filters.keyword || filters.assignedUserId || filters.priority !== "all") && (
+                <button 
+                    onClick={() => setFilters({ keyword: "", assignedUserId: "", priority: "all" })}
+                    className="ml-auto text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                >
+                    <X size={12} /> Clear
+                </button>
+            )}
         </div>
       </div>
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-6 h-full min-w-max pb-4 px-2">
-          {states.map((state) => (
-            <div key={state.id} className="w-80 flex-shrink-0 flex flex-col group/column">
-              <div className="flex items-center justify-between mb-3 px-1">
-                <h3 className="font-semibold text-gray-300 flex items-center gap-2">
-                  <span className={`w-3 h-3 rounded-full ${state.isFinal ? 'bg-green-500' : state.isInitial ? 'bg-blue-500' : 'bg-yellow-500'}`}></span>
-                  {state.name}
-                </h3>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded-full border border-gray-700">
-                      {tasks.filter(t => t.workflowStateId === state.id).length}
-                    </span>
-                    <button 
-                        onClick={() => handleDeleteState(state.id)}
-                        className="text-gray-600 hover:text-red-500 opacity-0 group-hover/column:opacity-100 transition-opacity"
-                        title="Delete Column"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+          {states.map((state) => {
+            const columnTasks = filteredTasks.filter(t => t.workflowStateId === state.id);
+            return (
+                <div key={state.id} className="w-80 flex-shrink-0 flex flex-col group/column">
+                <div className="flex items-center justify-between mb-3 px-1">
+                    <h3 className="font-semibold text-gray-300 flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${state.isFinal ? 'bg-green-500' : state.isInitial ? 'bg-blue-500' : 'bg-yellow-500'}`}></span>
+                    {state.name}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded-full border border-gray-700">
+                        {columnTasks.length}
+                        </span>
+                        <button 
+                            onClick={() => handleDeleteState(state.id)}
+                            className="text-gray-600 hover:text-red-500 opacity-0 group-hover/column:opacity-100 transition-opacity"
+                            title="Delete Column"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                 </div>
-              </div>
-              <div className="bg-[#1F2937]/50 rounded-xl p-3 flex-1 border border-gray-800/50 min-h-[200px] space-y-3">
-                {tasks.filter(t => t.workflowStateId === state.id).map(task => {
-                    const assignedMember = project?.members?.find(m => m.id === task.assignedUserId);
-                    return (
-                        <div key={task.id} className="bg-[#1F2937] p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 shadow-sm group relative">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className={`text-xs px-2 py-0.5 rounded ${task.priority === 2 ? 'bg-red-900/30 text-red-400' : task.priority === 1 ? 'bg-blue-900/30 text-blue-400' : 'bg-gray-700 text-gray-300'}`}>
-                              {task.priority === 2 ? 'High' : task.priority === 1 ? 'Medium' : 'Low'}
-                            </span>
-                            <div className="flex gap-2">
-                                <button onClick={() => openEditModal(task)} className="text-gray-600 hover:text-blue-400 transition-colors">
-                                    <Pencil size={14} />
-                                </button>
-                                <button onClick={() => handleDeleteTask(task.id)} className="text-gray-600 hover:text-red-400 transition-colors">
-                                    <Trash2 size={14} />
-                                </button>
-                            </div>
-                          </div>
-                          
-                          <h4 className="font-medium text-gray-200 mb-1">{task.title}</h4>
-                          <p className="text-xs text-gray-500 mb-3 line-clamp-2">{task.description}</p>
-                          
-                          {assignedMember && (
-                             <div className="mb-2">
-                                <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
-                                   👤 {assignedMember.username || assignedMember.email || "Assigned"}
+                
+                <div className="bg-[#1F2937]/50 rounded-xl p-3 flex-1 border border-gray-800/50 min-h-[200px] space-y-3">
+                    {columnTasks.map(task => {
+                        const assignedMember = project?.members?.find(m => m.id === task.assignedUserId);
+                        return (
+                            <div key={task.id} className="bg-[#1F2937] p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 shadow-sm group relative">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className={`text-xs px-2 py-0.5 rounded ${task.priority === 2 ? 'bg-red-900/30 text-red-400' : task.priority === 1 ? 'bg-blue-900/30 text-blue-400' : 'bg-gray-700 text-gray-300'}`}>
+                                {task.priority === 2 ? 'High' : task.priority === 1 ? 'Medium' : 'Low'}
                                 </span>
-                             </div>
-                          )}
+                                <div className="flex gap-2">
+                                    <button onClick={() => openEditModal(task)} className="text-gray-600 hover:text-blue-400 transition-colors">
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button onClick={() => handleDeleteTask(task.id)} className="text-gray-600 hover:text-red-400 transition-colors">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <h4 className="font-medium text-gray-200 mb-1">{task.title}</h4>
+                            <p className="text-xs text-gray-500 mb-3 line-clamp-2">{task.description}</p>
+                            
+                            {assignedMember && (
+                                <div className="mb-2">
+                                    <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                                    👤 {assignedMember.username || "Assigned"}
+                                    </span>
+                                </div>
+                            )}
 
-                          <div className="pt-3 border-t border-gray-700/50 flex items-center justify-between gap-2">
-                             <span className="text-xs text-gray-500">#{task.id}</span>
-                             <select 
-                                className="bg-[#111827] text-xs text-gray-300 border border-gray-600 rounded px-1 py-1 outline-none focus:border-blue-500 max-w-[120px]"
-                                value={task.workflowStateId}
-                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                             >
-                                 {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                             </select>
-                          </div>
+                            <div className="pt-3 border-t border-gray-700/50 flex items-center justify-between gap-2">
+                                <span className="text-xs text-gray-500">#{task.id}</span>
+                                <select 
+                                    className="bg-[#111827] text-xs text-gray-300 border border-gray-600 rounded px-1 py-1 outline-none focus:border-blue-500 max-w-[120px]"
+                                    value={task.workflowStateId}
+                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                >
+                                    {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            </div>
+                        );
+                    })}
+                    
+                    {columnTasks.length === 0 && (
+                        <div className="h-full flex items-center justify-center opacity-30">
+                            <div className="text-center">
+                                <p className="text-xs">No tasks</p>
+                            </div>
                         </div>
-                    );
-                })}
-              </div>
-            </div>
-          ))}
+                    )}
+                </div>
+                </div>
+            );
+          })}
 
           {states.length === 0 && (
             <div className="text-gray-500 m-auto text-center">
@@ -470,9 +546,6 @@ export default function ProjectDetail() {
                         Add
                     </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                    * Only users who are already in your Organization can be added.
-                </p>
             </div>
           </div>
         </div>
@@ -642,7 +715,6 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
