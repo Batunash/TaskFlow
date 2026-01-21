@@ -127,64 +127,7 @@ public class OrganizationControllerApiTests : BaseApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Fact]
-    public async Task InviteUser_ShouldReturn401_WhenTokenMissing()
-    {
-        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
-        {
-            Email = "invite@test.com"
-        });
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task InviteUser_ShouldSucceed_WhenOwnerInvitesUser()
-    {
-        var ownerToken = await RegisterAndLoginAsync("orgownerinvite");
-        var guestUserRegister = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
-        {
-            UserName = "guestuser",
-            Password = "Password123!"
-        });
-        var guestAuth = await guestUserRegister.Content.ReadFromJsonAsync<AuthResponseDto>();
-        var guestUserId = guestAuth!.UserId;
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
-        var createResponse = await Client.PostAsJsonAsync("/api/organization", new
-        {
-            Name = "Invite Org"
-        });
-        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
-        var createBody = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var newToken = createBody.GetProperty("accessToken").GetString();
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", newToken);
-        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
-        {
-            UserId = guestUserId
-        });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task InviteUser_ShouldFail_WhenUserIsNotOwner()
-    {
-        var ownerToken = await RegisterAndLoginAsync("realowner");
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
-        await Client.PostAsJsonAsync("/api/organization", new
-        {
-            Name = "Role Org"
-        });
-        var memberToken = await RegisterAndLoginAsync("memberuser");
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", memberToken);
-        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
-        {
-            UserId = 999
-        });
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
+    
     [Fact]
     public async Task OrganizationEndpoints_ShouldNotAllow_WrongHttpMethods()
     {
@@ -208,5 +151,103 @@ public class OrganizationControllerApiTests : BaseApiTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+    [Fact]
+    public async Task InviteUser_ShouldSucceed_WhenOwnerInvitesUser_ByUsername()
+    {
+        var ownerToken = await RegisterAndLoginAsync("invite_owner");
+        var guestUserRegister = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
+        {
+            UserName = "guest_for_invite",
+            Password = "Password123!"
+        });
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/organization", new { Name = "Invite Org" });
+        var createBody = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var ownerOrgToken = createBody.GetProperty("accessToken").GetString();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerOrgToken);
+        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
+        {
+            UserName = "guest_for_invite" 
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InviteUser_ShouldReturn401_WhenTokenMissing()
+    {
+        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
+        {
+            UserName = "targetuser"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InviteUser_ShouldSucceed_WhenOwnerInvitesUser()
+    {
+        var ownerToken = await RegisterAndLoginAsync("orgownerinvite");
+        var guestUserRegister = await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto
+        {
+            UserName = "guestuser",
+            Password = "Password123!"
+        });
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createResponse = await Client.PostAsJsonAsync("/api/organization", new
+        {
+            Name = "Invite Org"
+        });
+
+        var createBody = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var newToken = createBody.GetProperty("accessToken").GetString();
+
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
+        {
+            UserName = "guestuser"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InviteUser_ShouldFail_WhenUserIsNotOwner()
+    {
+        var ownerToken = await RegisterAndLoginAsync("realowner");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        await Client.PostAsJsonAsync("/api/organization", new
+        {
+            Name = "Role Org"
+        });
+        var memberToken = await RegisterAndLoginAsync("memberuser");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        var response = await Client.PostAsJsonAsync("/api/organization/invite", new
+        {
+            UserName = "someuser"
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+    [Fact]
+    public async Task User_Should_Be_Able_To_Accept_Invitation()
+    {
+        // ARRANGE
+        var ownerToken = await RegisterAndLoginAsync("flow_owner");
+        await Client.PostAsJsonAsync("/api/auth/register", new RegisterDto { UserName = "flow_guest", Password = "Password123!" });
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var createRes = await Client.PostAsJsonAsync("/api/organization", new { Name = "Flow Org" });
+        var orgData = await createRes.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        int orgId = orgData.GetProperty("organization").GetProperty("id").GetInt32();
+        string ownerOrgToken = orgData.GetProperty("accessToken").GetString();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerOrgToken);
+        await Client.PostAsJsonAsync("/api/organization/invite", new { UserName = "flow_guest" });
+        // ACT
+        var guestToken = await RegisterAndLoginAsync("flow_guest");
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", guestToken);
+        var acceptRes = await Client.PostAsync($"/api/organization/accept/{orgId}", null);
+
+        // ASSERT
+        Assert.Equal(HttpStatusCode.OK, acceptRes.StatusCode);
     }
 }

@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using FluentAssertions;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
+using Xunit;
 
 namespace TaskFlow.Tests.DomainTest
 {
     public class OrganizationTest
     {
         [Fact]
-        public void CreateOrganization_ShouldInitializeCorrectly_AndAddOwnerAsMember()
+        public void CreateOrganization_ShouldInitializeCorrectly_AndAddOwnerAsAcceptedMember()
         {
             // Arrange
             var name = "Tech Corp";
@@ -23,8 +25,11 @@ namespace TaskFlow.Tests.DomainTest
             organization.Name.Should().Be(name);
             organization.OwnerId.Should().Be(ownerId);
             organization.Members.Should().HaveCount(1);
-            organization.Members.First().UserId.Should().Be(ownerId);
-            organization.Members.First().Role.Should().Be(OrganizationRole.Owner);
+
+            var ownerMember = organization.Members.First();
+            ownerMember.UserId.Should().Be(ownerId);
+            ownerMember.Role.Should().Be(OrganizationRole.Owner);
+            ownerMember.IsAccepted.Should().BeTrue();
         }
 
         [Fact]
@@ -43,7 +48,7 @@ namespace TaskFlow.Tests.DomainTest
         }
 
         [Fact]
-        public void AddMember_ShouldAddNewMember_WhenUserIsNotAlreadyMember()
+        public void AddMember_ShouldAddNewMember_WithIsAcceptedFalse_ByDefault()
         {
             // Arrange
             var organization = new Organization("Test Org", ownerId: 1);
@@ -54,8 +59,11 @@ namespace TaskFlow.Tests.DomainTest
             organization.AddMember(newUserId, role);
 
             // Assert
-            organization.Members.Should().HaveCount(2); 
-            organization.Members.Should().Contain(m => m.UserId == newUserId && m.Role == role);
+            organization.Members.Should().HaveCount(2);
+
+            var newMember = organization.Members.First(m => m.UserId == newUserId);
+            newMember.Role.Should().Be(role);
+            newMember.IsAccepted.Should().BeFalse();
         }
 
         [Fact]
@@ -64,15 +72,33 @@ namespace TaskFlow.Tests.DomainTest
             // Arrange
             var ownerId = 1;
             var organization = new Organization("Test Org", ownerId);
-            organization.AddMember(2, OrganizationRole.Admin); 
+            organization.AddMember(2, OrganizationRole.Admin);
 
             // Act
-            organization.AddMember(2, OrganizationRole.Member); 
+            organization.AddMember(2, OrganizationRole.Member);
 
             // Assert
-            organization.Members.Should().HaveCount(2); 
+            organization.Members.Should().HaveCount(2);
             var member = organization.Members.First(m => m.UserId == 2);
             member.Role.Should().Be(OrganizationRole.Admin);
+        }
+
+        [Fact]
+        public void AcceptInvitation_ShouldChangeIsAcceptedStatusToTrue()
+        {
+            // Arrange
+            var organization = new Organization("Invite Org", ownerId: 1);
+            var invitedUserId = 50;
+            organization.AddMember(invitedUserId, OrganizationRole.Member);
+
+            var member = organization.Members.First(m => m.UserId == invitedUserId);
+            member.IsAccepted.Should().BeFalse(); 
+
+            // Act
+            member.AcceptInvitation(); 
+
+            // Assert
+            member.IsAccepted.Should().BeTrue(); 
         }
 
         [Fact]
