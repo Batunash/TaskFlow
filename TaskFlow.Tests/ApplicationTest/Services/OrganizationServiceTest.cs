@@ -102,7 +102,7 @@ namespace TaskFlow.Tests.ApplicationTest.Services
         {
             // Arrange
             int ownerId = 99;
-            int currentUserId = 1; 
+            int currentUserId = 1;
             int orgId = 10;
             _mockUserService.Setup(s => s.UserId).Returns(currentUserId);
             _mockTenantService.Setup(s => s.OrganizationId).Returns(orgId);
@@ -110,9 +110,9 @@ namespace TaskFlow.Tests.ApplicationTest.Services
             var organization = new Organization("My Org", ownerId);
             typeof(Organization).GetProperty("Id")?.SetValue(organization, orgId);
             organization.AddMember(currentUserId, OrganizationRole.Member);
-
+            var member = organization.Members.First(m => m.UserId == currentUserId);
+            member.AcceptInvitation();
             _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync(organization);
-
             // Act
             var result = await _organizationService.GetCurrentAsync();
 
@@ -241,6 +241,82 @@ namespace TaskFlow.Tests.ApplicationTest.Services
             var member = organization.Members.First(m => m.UserId == userId);
             Assert.True(member.IsAccepted); 
             _mockOrgRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        }
+        [Fact]
+        public async Task GetMembersAsync_Should_Return_Only_Accepted_Members()
+        {
+            // Arrange
+            int orgId = 10;
+            int ownerId = 1;
+            int acceptedMemberId = 2;
+            int pendingMemberId = 3;
+            var ownerUser = new User("owner", "pass", null);
+            typeof(User).GetProperty("Id")?.SetValue(ownerUser, ownerId);
+            var acceptedUser = new User("acceptedUser", "pass", null);
+            typeof(User).GetProperty("Id")?.SetValue(acceptedUser, acceptedMemberId);
+            var organization = new Organization("Test Org", ownerId);
+            typeof(Organization).GetProperty("Id")?.SetValue(organization, orgId);
+            organization.AddMember(acceptedMemberId, OrganizationRole.Member);
+            var acceptedMemberEntity = organization.Members.First(m => m.UserId == acceptedMemberId);
+            acceptedMemberEntity.AcceptInvitation();
+            organization.AddMember(pendingMemberId, OrganizationRole.Member);
+            _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync(organization);
+            _mockUserRepo.Setup(r => r.GetByIdAsync(ownerId)).ReturnsAsync(ownerUser);
+            _mockUserRepo.Setup(r => r.GetByIdAsync(acceptedMemberId)).ReturnsAsync(acceptedUser);
+
+            // Act
+            var result = await _organizationService.GetMembersAsync(orgId);
+
+            // Assert
+            Assert.Equal(2, result.Count); 
+            Assert.Contains(result, u => u.Id == ownerId);
+            Assert.Contains(result, u => u.Id == acceptedMemberId);
+            Assert.DoesNotContain(result, u => u.Id == pendingMemberId); 
+        }
+
+        [Fact]
+        public async Task GetMembersAsync_Should_Throw_NotFound_When_Organization_Does_Not_Exist()
+        {
+            // Arrange
+            int orgId = 999;
+            _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync((Organization?)null);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<NotFoundException>(() => _organizationService.GetMembersAsync(orgId));
+        }
+
+        [Fact]
+        public async Task GetMyInvitationsAsync_Should_Return_Pending_Invitations_With_Correct_Details()
+        {
+            // Arrange
+            int currentUserId = 5;
+
+           
+            var org1 = new Organization("Org One", 99); 
+            typeof(Organization).GetProperty("Id")?.SetValue(org1, 101);
+            org1.AddMember(currentUserId, OrganizationRole.Member); 
+            var org2 = new Organization("Org Two", 88);
+            typeof(Organization).GetProperty("Id")?.SetValue(org2, 102); 
+            org2.AddMember(currentUserId, OrganizationRole.Admin); 
+            var pendingOrgs = new List<Organization> { org1, org2 };
+            _mockOrgRepo.Setup(r => r.GetPendingInvitationsByUserIdAsync(currentUserId))
+                        .ReturnsAsync(pendingOrgs);
+
+            // Act
+            var result = await _organizationService.GetMyInvitationsAsync(currentUserId);
+
+            // Assert
+            Assert.Equal(2, result.Count);
+
+            var invite1 = result.FirstOrDefault(i => i.OrganizationId == 101);
+            Assert.NotNull(invite1);
+            Assert.Equal("Org One", invite1.OrganizationName);
+            Assert.Equal(OrganizationRole.Member.ToString(), invite1.Role);
+
+            var invite2 = result.FirstOrDefault(i => i.OrganizationId == 102);
+            Assert.NotNull(invite2);
+            Assert.Equal("Org Two", invite2.OrganizationName);
+            Assert.Equal(OrganizationRole.Admin.ToString(), invite2.Role);
         }
     }
 }

@@ -57,7 +57,8 @@ namespace TaskFlow.Application.Services
             {
                 Id = task.Id,
                 Title = task.Title,
-                StateName = initialState.Name
+                StateName = initialState.Name,
+                ProjectId = task.ProjectId
             };
         }
 
@@ -105,6 +106,7 @@ namespace TaskFlow.Application.Services
                 {
                     Id = t.Id,
                     Title = t.Title,
+                    ProjectId = t.ProjectId,
                     StateId = t.WorkflowStateId,
                     StateName = t.WorkflowState?.Name ?? string.Empty
                 }).ToList();
@@ -133,7 +135,8 @@ namespace TaskFlow.Application.Services
                 Id = t.Id,
                 Title = t.Title,
                 StateId = t.WorkflowStateId,
-                StateName = t.WorkflowState?.Name ?? string.Empty
+                StateName = t.WorkflowState?.Name ?? string.Empty,
+                ProjectId = t.ProjectId
             }).ToList();
             return new PageResult<ResponseTaskDto>
             {

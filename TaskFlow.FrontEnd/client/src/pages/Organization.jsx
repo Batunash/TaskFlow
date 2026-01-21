@@ -95,11 +95,10 @@ export default function Organization() {
               <div key={member.id} className="flex items-center justify-between bg-[#111827] p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
-                    {member.username?.[0]?.toUpperCase() || "U"}
+                    {member.username||member.userName?.[0]?.toUpperCase() || "U"}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-200">{member.username}</p>
-                    <p className="text-xs text-gray-500">{member.email}</p>
+                    <p className="font-medium text-gray-200">{member.userName || member.username}</p>
                   </div>
                 </div>
                 <span className="px-2 py-1 rounded text-xs bg-gray-800 border border-gray-700 text-gray-400">

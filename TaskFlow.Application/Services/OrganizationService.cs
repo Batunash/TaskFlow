@@ -118,6 +118,33 @@ namespace TaskFlow.Application.Services
             }
             await organizationRepository.SaveChangesAsync();
         }
+        public async Task<List<UserDto>> GetMembersAsync(int organizationId)
+        {
+            var organization = await organizationRepository.GetByIdWithMembersAsync(organizationId);
+
+            if (organization == null)
+            {
+                throw new NotFoundException($"Organization with ID {organizationId} not found.");
+            }
+            var membersDto = new List<UserDto>();
+            foreach (var member in organization.Members)
+            {
+                if (member.IsAccepted) 
+                {
+                    var user = await userRepository.GetByIdAsync(member.UserId);
+                    if (user != null)
+                    {
+                        membersDto.Add(new UserDto
+                        {
+                            Id = user.Id,
+                            UserName = user.UserName
+                        });
+                    }
+                }
+            }
+            
+            return membersDto;
+        }
 
         public async Task<List<OrganizationInvitationDto>> GetMyInvitationsAsync(int currentUserId)
         {

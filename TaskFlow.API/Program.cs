@@ -29,7 +29,7 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
-                PermitLimit = 5,
+                PermitLimit = 100,
                 QueueLimit = 0,
                 Window = TimeSpan.FromMinutes(1)
             }));
@@ -41,7 +41,7 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
-                PermitLimit = 60,
+                PermitLimit = 1000,
                 QueueLimit = 2,
                 Window = TimeSpan.FromMinutes(1)
             }));
