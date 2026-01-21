@@ -95,9 +95,6 @@ namespace TaskFlow.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("IsAccepted")
-                        .HasColumnType("bit");
-
                     b.Property<int?>("OrganizationId")
                         .HasColumnType("int");
 

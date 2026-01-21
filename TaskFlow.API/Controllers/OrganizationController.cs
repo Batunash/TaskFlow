@@ -44,20 +44,6 @@ namespace TaskFlow.API.Controllers
             await organizationService.InviteAsync(request, currentUserService.UserId!.Value);
             return Ok(new { message = "User invited successfully" });
         }
-        [HttpPost("accept/{organizationId}")]
-        public async Task<IActionResult> AcceptInvitation(int organizationId)
-        {
-            var userId = currentUserService.UserId!.Value;
-            await organizationService.AcceptInvitationAsync(organizationId, currentUserService.UserId!.Value);
-            return Ok(new { message = "Invitation accepted. You are now a member." });
-        }
-        [HttpGet("invitations")]
-        public async Task<IActionResult> GetMyInvitations()
-        {
-            var userId = currentUserService.UserId!.Value;
-            var result = await organizationService.GetMyInvitationsAsync(userId);
-            return Ok(result);
-        }
 
     }
 }

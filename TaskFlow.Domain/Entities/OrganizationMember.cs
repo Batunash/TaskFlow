@@ -9,20 +9,14 @@ namespace TaskFlow.Domain.Entities
     {
         public int Id { get; private set; }
         public int UserId { get; private set; }
-        public bool IsAccepted { get; private set; }
         public OrganizationRole Role { get; private set; }
 
         private OrganizationMember() { }
 
-        public OrganizationMember(int userId, OrganizationRole role, bool isAccepted = false)
+        public OrganizationMember(int userId, OrganizationRole role)
         {
             UserId = userId;
             Role = role;
-            IsAccepted = isAccepted;
-        }
-        public void AcceptInvitation()
-        {
-            IsAccepted = true;
         }
     }
 

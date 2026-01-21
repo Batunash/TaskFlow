@@ -28,7 +28,7 @@ namespace TaskFlow.Domain.Entities
 
             Name = name;
             OwnerId = ownerId;
-            _members.Add(new OrganizationMember(ownerId, OrganizationRole.Owner, isAccepted: true));
+            _members.Add(new OrganizationMember(ownerId, OrganizationRole.Owner));
 
         }
         public void Update(string name)
@@ -41,11 +41,10 @@ namespace TaskFlow.Domain.Entities
         }
         public void AddMember(int userId, OrganizationRole role)
         {
-            if (!Members.Any(m => m.UserId == userId))
-            {
-                bool isOwner = role == OrganizationRole.Owner;
-                _members.Add(new OrganizationMember(userId, role));
-            }
+            if (_members.Any(m => m.UserId == userId))
+                return;
+
+            _members.Add(new OrganizationMember(userId, role));
         }
 
         public bool IsAdmin(int userId)
