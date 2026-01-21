@@ -9,8 +9,8 @@ const organizationService = {
     const response = await axiosClient.get('/Organization/current');
     return response.data;
   },
-  inviteUser: async (email) => {
-    const response = await axiosClient.post('/Organization/invite', { email });
+  inviteUser: async (username) => {
+    const response = await axiosClient.post('/Organization/invite', { username });
     return response.data;
   },
   getMembers: async (orgId) => {

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import MainLayout from './layouts/MainLayout';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import Organization from './pages/Organization';
 function App() {
   return (
     <Routes>
@@ -15,6 +16,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} /> 
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="organization" element={<Organization />} />
       </Route>
     </Routes>
   );
