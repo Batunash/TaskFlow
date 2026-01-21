@@ -62,7 +62,7 @@ export default function ProjectDetail() {
     try {
       const query = {
         projectId: parseInt(id),
-        pageSize: 1000, 
+        pageSize: 49, 
       };
 
       if (filters.assignedUserId) {

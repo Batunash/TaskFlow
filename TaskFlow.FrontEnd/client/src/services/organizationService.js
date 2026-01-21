@@ -14,9 +14,9 @@ const organizationService = {
     return response.data;
   },
  getMembers: async (orgId) => {
-  const response = await axiosClient.get(`/Organization/${orgId}/members`);
-  return response.data;
-},
+    const response = await axiosClient.get(`/Organization/${orgId}/members`);
+    return response.data;
+  },
   getInvitations: async () => {
     const response = await axiosClient.get('/Organization/invitations');
     return response.data;
