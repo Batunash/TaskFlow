@@ -84,6 +84,28 @@ export default function Register() {
               />
             </div>
           </div>
+          <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Password
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-gray-500" />
+            </div>
+            <input
+              type="password"
+              required
+              className="block w-full pl-10 pr-3 py-2 bg-[#111827] border border-gray-600 rounded text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            />
+          </div>
+          {/* Şifre kuralları uyarısı */}
+          <p className="mt-1 text-xs text-gray-500">
+            En az 6 karakter; büyük harf, küçük harf ve rakam içermelidir.
+          </p>
+        </div>
           <button
             type="submit"
             disabled={loading}
