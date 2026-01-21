@@ -87,6 +87,11 @@ namespace TaskFlow.Application.Services
             {
                 throw new NotFoundException($"User '{dto.UserName}' not found.");
             }
+            if (userToInvite.OrganizationId.HasValue)
+            {
+                throw new BusinessRuleException("This user has organization already");
+            }
+                    
             organization.AddMember(userToInvite.Id, OrganizationRole.Member);
 
             await organizationRepository.SaveChangesAsync();

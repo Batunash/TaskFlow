@@ -19,11 +19,8 @@ export default function Organization() {
       const userData = await userService.getMe();
 
       if (userData.organizationId) {
-        // Fetch Org Details
         const orgData = await organizationService.getCurrent();
         setOrg(orgData);
-
-        // Fetch Members
         const membersData = await organizationService.getMembers(userData.organizationId);
         setMembers(membersData || []);
       }
@@ -34,23 +31,23 @@ export default function Organization() {
     }
   };
 
-  const handleInvite = async (e) => {
-    e.preventDefault();
-    if (!inviteUsername.trim()) return;
+ const handleInvite = async (e) => {
+  e.preventDefault();
+  if (!inviteUsername.trim()) return;
 
-    setInviting(true);
-    try {
-      await organizationService.inviteUser(inviteUsername);
-      alert("User invited successfully!");
-      setInviteUsername("");
-      fetchOrgData(); // Refresh list
-    } catch (error) {
-      console.error("Invite error:", error);
-      alert(error.response?.data?.message || "Failed to invite user. Make sure the username exists.");
-    } finally {
-      setInviting(false);
-    }
-  };
+  setInviting(true);
+  try {
+    await organizationService.inviteUser(inviteUsername);
+    alert("İnvited succesfuly");
+    setInviteUsername("");
+    fetchOrgData(); 
+  } catch (error) {
+    const message = error.response?.data?.message || "Could not send invite";
+    alert(message); 
+  } finally {
+    setInviting(false);
+  }
+};
 
   if (loading) return <div className="text-white text-center mt-20">Loading...</div>;
 
@@ -83,7 +80,6 @@ export default function Organization() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Left Column: Members List */}
         <div className="bg-[#1F2937] rounded-xl border border-gray-700 p-6 flex flex-col">
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
             <Users className="text-blue-400" size={20} />
@@ -114,8 +110,6 @@ export default function Organization() {
             )}
           </div>
         </div>
-
-        {/* Right Column: Invite Form */}
         <div>
           <div className="bg-[#1F2937] rounded-xl border border-gray-700 p-6 sticky top-6">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
