@@ -13,6 +13,16 @@ using TaskFlow.Infrastructure.Identity;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddCors(options =>
+{
+   options.AddPolicy("VercelPolicy", policy =>
+    {
+        policy.WithOrigins("https://task-flow-ashen-five.vercel.app") 
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
 if (builder.Environment.IsDevelopment())
 {
     DotNetEnv.Env.Load();
@@ -107,6 +117,7 @@ if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseMiddleware<TaskFlow.API.Middlewares.GlobalExceptionHandlerMiddleware>();
+app.UseCors("VercelPolicy");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
