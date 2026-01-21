@@ -41,5 +41,12 @@ namespace TaskFlow.Infrastructure.Repositories
         {
             await db.SaveChangesAsync();
         }
+        public async Task<List<Organization>> GetPendingInvitationsByUserIdAsync(int userId)
+        {
+            return await db.Organizations
+                .Include(o => o.Members)
+                .Where(o => o.Members.Any(m => m.UserId == userId && !m.IsAccepted))
+                .ToListAsync();
+        }
     }
 }

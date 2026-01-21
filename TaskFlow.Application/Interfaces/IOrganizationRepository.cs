@@ -12,6 +12,7 @@ namespace TaskFlow.Application.Interfaces
         Task<Organization?> GetByIdAsync(int id);
         Task<Organization?> GetByUserIdAsync(int userId);
         Task<Organization?> GetByIdWithMembersAsync(int id);
+        Task<List<Organization>> GetPendingInvitationsByUserIdAsync(int userId);
         Task SaveChangesAsync();
     }
 }
