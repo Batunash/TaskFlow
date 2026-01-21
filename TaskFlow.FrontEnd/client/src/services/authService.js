@@ -9,6 +9,10 @@ const authService = {
   register: async (data) => {
     const response = await axiosClient.post('/Auth/Register', data);
     return response.data;
+  },
+  me: async () => {
+    const response = await axiosClient.get('/Auth/me');
+    return response.data;
   }
 };
 

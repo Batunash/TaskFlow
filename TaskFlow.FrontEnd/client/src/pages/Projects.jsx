@@ -1,22 +1,20 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, X, FolderKanban, Trash2 } from "lucide-react"; 
-import { Link } from "react-router-dom"; 
+import { Plus, Search, Layers } from "lucide-react"; 
 import projectService from "../services/projectService";
 import workflowService from "../services/workflowService"; 
+import ProjectCard from "../components/ProjectCard";
+import CreateProjectModal from "../components/CreateProjectModal";
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [createLoading, setCreateLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-  });
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, []); 
 
   const fetchProjects = async () => {
     try {
@@ -32,175 +30,119 @@ export default function Projects() {
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
-    
-    if (!formData.name.trim()) {
-        alert("Project name cannot be empty!");
-        return;
-    }
+    const formData = new FormData(e.target);
+    const newProjectData = {
+        name: formData.get("name"),
+        description: formData.get("description")
+    };
 
+    if (!newProjectData.name.trim()) return;
+    
+    setCreateLoading(true);
     try {
-      const newProject = await projectService.create(formData);
-      if (newProject && newProject.id) {
-        try {
-          await workflowService.create(newProject.id);
-        } catch (wfError) {
-          console.error("Workflow initialization error:", wfError);
-        }
+      const newProject = await projectService.create(newProjectData);
+      if (newProject?.id) {
+          try {
+             await workflowService.create(newProject.id);
+          } catch (wfError) {
+             console.warn("Workflow auto-create failed, user can add manually.", wfError);
+          }
       }
       
-      await fetchProjects();
+      await fetchProjects(); 
       setIsModalOpen(false);
-      setFormData({ name: "", description: "" });
-      
     } catch (error) {
       console.error(error);
-      const serverMessage = error.response?.data?.errors 
-                            ? Object.values(error.response.data.errors).flat().join(", ")
-                            : "Failed to create project.";
-      alert(serverMessage);
+      alert("Failed to create project.");
+    } finally {
+      setCreateLoading(false);
     }
   };
-  const handleDeleteProject = async (e, projectId) => {
-    e.preventDefault(); 
-    e.stopPropagation(); 
-    
-    if (!window.confirm("Are you sure you want to delete this project? This cannot be undone.")) return;
 
-    try {
-      await projectService.delete(projectId);
-      setProjects(projects.filter(p => p.id !== projectId)); 
-    } catch (error) {
-      console.error("Delete failed:", error);
-      alert("Failed to delete project.");
-    }
+  const handleDeleteProject = async (projectId) => {
+      if(!window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) return;
+
+      try {
+          setProjects(prev => prev.filter(p => p.id !== projectId));
+          await projectService.delete(projectId);
+      } catch (error) {
+          console.error("Delete failed:", error);
+          alert("Could not delete project.");
+          fetchProjects(); 
+      }
   };
 
   const filteredProjects = projects.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  if (loading) return <div className="text-center mt-20 text-gray-400">Loading projects...</div>;
+
   return (
-    <div className="text-white">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+    <div className="h-full flex flex-col text-white">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-gray-800 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-gray-100">Projects</h2>
-          <p className="text-gray-400 mt-1">Manage and track your ongoing projects</p>
+          <h1 className="text-3xl font-bold text-gray-100 flex items-center gap-3">
+            <Layers className="text-blue-500" /> Projects
+          </h1>
+          <p className="text-gray-400 mt-1">Manage your team's work and workflows.</p>
         </div>
-        
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-blue-900/20"
-        >
-          <Plus size={20} /> New Project
-        </button>
-      </div>
 
-      <div className="mb-8 relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-        <input 
-          type="text" 
-          placeholder="Search projects..." 
-          className="w-full bg-[#1F2937] border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-gray-300 focus:outline-none focus:border-blue-500 transition-colors"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="flex gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search projects..." 
+              className="bg-[#1F2937] border border-gray-700 text-white pl-10 pr-4 py-2 rounded-lg outline-none focus:border-blue-500 w-full md:w-64 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-lg shadow-blue-900/20"
+          >
+            <Plus size={20} /> New Project
+          </button>
+        </div>
       </div>
-
-      {loading ? (
-        <div className="text-center py-20 text-gray-500">Loading projects...</div>
-      ) : filteredProjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {filteredProjects.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
           {filteredProjects.map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`} className="block group">
-              <div className="bg-[#1F2937] border border-gray-700 rounded-xl p-5 hover:border-blue-500/50 transition-all relative h-full">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-blue-900/20 rounded-lg text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <FolderKanban size={20} />
-                  </div>
-                  <button 
-                    onClick={(e) => handleDeleteProject(e, project.id)}
-                    className="text-gray-500 hover:text-red-500 p-1 hover:bg-gray-700/50 rounded transition-colors z-10"
-                    title="Delete Project"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2 truncate pr-6">{project.name}</h3>
-                <p className="text-gray-400 text-sm line-clamp-2 mb-4 break-words">
-                  {project.description || "No description provided."}
-                </p>
-              </div>
-            </Link>
+            <ProjectCard 
+              key={project.id} 
+              project={project} 
+              onDelete={handleDeleteProject}
+            />
           ))}
         </div>
       ) : (
-        <div className="text-center py-20 bg-[#1F2937]/50 rounded-xl border border-dashed border-gray-700">
-          <FolderKanban className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">No projects found.</p>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="text-blue-400 hover:text-blue-300 font-medium"
-          >
-            Create your first project
-          </button>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-
-            <h3 className="text-xl font-bold mb-6">Create New Project</h3>
-            
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Project Name</label>
-                <input 
-                  type="text" 
-                  required
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none"
-                  placeholder="e.g. Website Redesign"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
-                <textarea 
-                  className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none h-24 resize-none"
-                  placeholder="Project details..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                />
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Create Project
-                </button>
-              </div>
-            </form>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-gray-800 rounded-xl bg-[#1F2937]/30">
+          <div className="bg-gray-800 p-4 rounded-full mb-4">
+            <Layers size={48} className="text-gray-600" />
           </div>
+          <h3 className="text-xl font-medium text-gray-300">No projects found</h3>
+          <p className="text-gray-500 mt-2 max-w-sm">
+            {searchTerm ? "Try adjusting your search terms." : "Get started by creating your first project to organize tasks."}
+          </p>
+          {!searchTerm && (
+             <button 
+                onClick={() => setIsModalOpen(true)}
+                className="mt-6 text-blue-400 hover:text-blue-300 font-medium"
+             >
+                Create your first project &rarr;
+             </button>
+          )}
         </div>
       )}
+      <CreateProjectModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateProject}
+        loading={createLoading}
+      />
     </div>
   );
 }

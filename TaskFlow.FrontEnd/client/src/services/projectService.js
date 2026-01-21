@@ -29,9 +29,8 @@ const projectService = {
     const response = await axiosClient.put(`/Project/${id}`, payload);
     return response.data;
   },
-
   delete: async (id) => {
-    await axiosClient.post(`/Project/${id}`);
+    await axiosClient.delete(`/Project/${id}`);
   },
   addMember: async (projectId, userId, role = "Member") => {
     const roleMap = {
@@ -49,7 +48,11 @@ const projectService = {
     return response.data;
   },
   removeMember: async (projectId, userId) => {
-    const response = await axiosClient.delete(`/Project/${projectId}/members/${userId}`);
+    const payload = {
+        projectId: parseInt(projectId),
+        userId: parseInt(userId)
+    };
+    const response = await axiosClient.post(`/Project/${projectId}/members/${userId}`, payload);
     return response.data;
   }
 };

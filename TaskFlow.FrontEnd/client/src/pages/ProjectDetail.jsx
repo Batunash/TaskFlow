@@ -27,6 +27,7 @@ export default function ProjectDetail() {
     assignedUserId: "",
     priority: "all"
   });
+  const [actionLoading, setActionLoading] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -107,26 +108,31 @@ export default function ProjectDetail() {
   }, [tasks, filters.keyword, filters.priority]);
   const handleCreateTask = async (e) => {
     e.preventDefault();
-    try {
-      const initialState = states.find(s => s.isInitial);
-      if (!initialState) {
-        alert("No 'Initial State' defined. Please add a column and mark it as 'Initial State'.");
-        return;
-      }
+    if (actionLoading) return; 
 
+    const initialState = states.find(s => s.isInitial);
+    if (!initialState) {
+        alert("No 'Initial State' defined.");
+        return;
+    }
+
+    setActionLoading(true); 
+    try {
       await taskService.create({
         ...newTask,
         projectId: parseInt(id),
         workflowStateId: initialState.id, 
         priority: parseInt(newTask.priority)
       });
+      await fetchTasks(); 
       
       setIsTaskModalOpen(false);
       setNewTask({ title: "", description: "", priority: 1 });
-      fetchTasks();
     } catch (error) {
       console.error(error);
       alert("Failed to create task.");
+    } finally {
+      setActionLoading(false); 
     }
   };
 
@@ -154,9 +160,10 @@ export default function ProjectDetail() {
 
   const handleUpdateTask = async (e) => {
     e.preventDefault();
+    if (actionLoading || !editingTask) return;
+
+    setActionLoading(true); 
     try {
-      if (!editingTask) return;
-      
       await taskService.update(editingTask.id, {
         title: editingTask.title,
         description: editingTask.description,
@@ -164,6 +171,7 @@ export default function ProjectDetail() {
       });
 
       const originalTask = tasks.find(t => t.id === editingTask.id);
+      
       if (editingTask.assignedUserId && editingTask.assignedUserId != originalTask.assignedUserId) {
           await taskService.assign(editingTask.id, parseInt(editingTask.assignedUserId));
       }
@@ -172,8 +180,10 @@ export default function ProjectDetail() {
       setIsEditModalOpen(false);
       setEditingTask(null);
     } catch (error) {
-      console.error("Update/Assign error:", error);
+      console.error("Update error:", error);
       alert("Failed to update task.");
+    } finally {
+        setActionLoading(false); 
     }
   };
   
@@ -247,29 +257,48 @@ export default function ProjectDetail() {
 
   const handleAddMember = async () => {
     if (!selectedMemberId) return;
+    if (actionLoading) return;
+
+    setActionLoading(true); 
     try {
         await projectService.addMember(id, selectedMemberId, "Member");
-        const pData = await projectService.getById(id);
-        setProject(pData);
+        const addedMember = orgMembers.find(m => m.id === selectedMemberId);
+        
+        if (addedMember) {
+            setProject(prev => ({
+                ...prev,
+                members: [...(prev.members || []), addedMember]
+            }));
+        }
+
         setSelectedMemberId("");
-        alert("Member added successfully!");
     } catch (error) {
         console.error("Add member error:", error);
         alert("Failed to add member.");
+    } finally {
+        setActionLoading(false);
     }
-  };
+};
+const handleRemoveMember = async (userId) => {
+    if (!window.confirm("Are you sure you want to remove this member?")) return;
+    
+    if (actionLoading) return; 
 
-  const handleRemoveMember = async (userId) => {
-    if(!window.confirm("Are you sure you want to remove this member?")) return;
+    setActionLoading(true);
     try {
-        await projectService.removeMember(id, userId);
-        const pData = await projectService.getById(id);
-        setProject(pData);
+        await projectService.removeMember(id, userId);        
+        setProject(prev => ({
+            ...prev,
+            members: prev.members.filter(m => m.id !== userId)
+        }));
+        
     } catch (error) {
         console.error("Remove member error:", error);
         alert("Failed to remove member.");
+    } finally {
+        setActionLoading(false);
     }
-  };
+};
   const openProjectSettings = () => {
     setProjectForm({
         name: project.name,
@@ -390,6 +419,7 @@ export default function ProjectDetail() {
         newTask={newTask}
         setNewTask={setNewTask}
         onSubmit={handleCreateTask}
+        loading={actionLoading}
       />
 
       <EditTaskModal 
@@ -399,6 +429,7 @@ export default function ProjectDetail() {
         setEditingTask={setEditingTask}
         orgMembers={orgMembers}
         onUpdate={handleUpdateTask}
+        loading={actionLoading}
       />
 
       <MembersModal 

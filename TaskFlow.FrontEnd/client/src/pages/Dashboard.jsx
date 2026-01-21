@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderKanban,CheckSquare,Users,Activity,Building2,Plus,ArrowRight,LogOut,Check} from "lucide-react";
+import { FolderKanban, CheckSquare, Users, Activity, Building2, Plus, ArrowRight, LogOut, Check } from "lucide-react";
 import userService from "../services/userService";
 import projectService from "../services/projectService";
 import taskService from "../services/taskService";
@@ -27,17 +27,24 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       const userData = await userService.getMe();
+      if (!userData) throw new Error("User data could not be fetched");
       setUser(userData);
 
       if (userData.organizationId) {
         const [projectsData, tasksData] = await Promise.all([
           projectService.getAll(),
-          taskService.getAll()
+          taskService.getAll({ assignedUserId: userData.id })
         ]);
 
+        const totalTasks = tasksData?.totalCount 
+                           ?? (tasksData?.items?.length) 
+                           ?? (Array.isArray(tasksData) ? tasksData.length : 0);
+
+        const totalProjects = Array.isArray(projectsData) ? projectsData.length : 0;
+
         setStats({
-          projectCount: Array.isArray(projectsData) ? projectsData.length : 0,
-          taskCount: Array.isArray(tasksData) ? tasksData.length : 0,
+          projectCount: totalProjects,
+          taskCount: totalTasks,
           userRole: userData.role || "Member"
         });
       } else {
@@ -45,12 +52,11 @@ export default function Dashboard() {
             const invites = await organizationService.getInvitations();
             setInvitations(Array.isArray(invites) ? invites : []);
         } catch (invError) {
-            console.warn("Davetler çekilemedi veya boş:", invError);
             setInvitations([]);
         }
       }
     } catch (error) {
-      console.error("Dashboard verisi çekilirken hata:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -59,49 +65,36 @@ export default function Dashboard() {
   const handleCreateOrganization = async (e) => {
     e.preventDefault();
     setCreatingOrg(true);
-    
     try {
       const response = await organizationService.create(orgForm);
-      console.log("Organization created:", response);
       const token = response.accessToken || response.AccessToken;
 
       if (token) {
         localStorage.setItem("token", token);
         const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-        const updatedUser = {
+        localStorage.setItem("user", JSON.stringify({
             ...currentUser,
             organizationId: response.organization?.id || response.Organization?.id
-        };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-
-        alert("Workspace created successfully! Refreshing session...");
-        setOrgForm({ name: "", description: "" });        
+        }));
         window.location.reload(); 
-        
       } else {
-        alert("Organization created but token was missing. Please login again.");
-        navigate("/login");
+        handleLogout();
       }
-
     } catch (error) {
-      console.error(error);
       alert(error.response?.data?.message || "Failed to create organization.");
     } finally {
       setCreatingOrg(false);
     }
   };
+
   const handleAcceptInvite = async (orgId) => {
     if(!window.confirm("Do you want to join this organization?")) return;
-    
     setAcceptingInvite(true);
     try {
         await organizationService.acceptInvitation(orgId);
-        alert("Invitation accepted! You are joining the team...");
-        window.location.reload(); 
+        handleLogout(); 
     } catch (error) {
-        console.error("Invite accept error:", error);
         alert(error.response?.data?.message || "Failed to accept invitation.");
-    } finally {
         setAcceptingInvite(false);
     }
   };
@@ -109,7 +102,7 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    navigate("/login");
+    window.location.href = "/login";
   };
 
   if (loading) {
@@ -119,6 +112,7 @@ export default function Dashboard() {
       </div>
     );
   }
+
   if (!user?.organizationId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 text-white">
@@ -227,6 +221,7 @@ export default function Dashboard() {
       </div>
     );
   }
+
   return (
     <div className="text-white">
       <header className="mb-8 border-b border-gray-800 pb-6">
@@ -269,7 +264,7 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-lg font-bold text-gray-100 truncate">Active</p>
-          <div className="mt-2 text-xs text-gray-500">Organization ID: {user.organizationId}</div>
+          <div className="mt-2 text-xs text-gray-500">Organization ID: {user?.organizationId}</div>
         </div>
       </div>
 

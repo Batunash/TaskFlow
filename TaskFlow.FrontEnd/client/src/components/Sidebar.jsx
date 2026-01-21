@@ -16,7 +16,7 @@ export default function Sidebar() {
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: CheckSquare, label: "My Tasks", path: "/tasks" },
     { icon: Users, label: "Organization", path: "/organization" },
-    { icon: Settings, label: "Settings", path: "/settings" },
+
   ];
 
   return (

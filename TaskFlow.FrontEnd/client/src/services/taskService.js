@@ -3,27 +3,28 @@ import axiosClient from '../api/axiosClient';
 const taskService = {
   getAll: async (filter = {}) => {
     const params = new URLSearchParams(filter).toString();
-    const response = await axiosClient.get(`/Task?${params}`);
+    const response = await axiosClient.get(`/task?${params}`);
     return response.data; 
   },
-
   getByProjectId: async (projectId) => {
     const response = await axiosClient.get(`/project/${projectId}/tasks`);
     return response.data;
   },
-
   create: async (taskData) => {
-    const response = await axiosClient.post('/Task', taskData);
+    const response = await axiosClient.post('/task', taskData);
     return response.data;
   },
-
-  update: async (taskData) => {
-    const response = await axiosClient.put('/Task', taskData);
+  update: async (taskId, taskData) => {
+    const payload = {
+        id: parseInt(taskId), 
+        ...taskData          
+    };
+    const response = await axiosClient.put('/task', payload);
     return response.data;
   },
 
   delete: async (taskId) => {
-    const response = await axiosClient.delete(`/Task/${taskId}`);
+    const response = await axiosClient.delete(`/task/${taskId}`);
     return response.data;
   },
 
@@ -35,7 +36,6 @@ const taskService = {
     const response = await axiosClient.post('/task/assign', payload);
     return response.data;
   },
-
   changeStatus: async (taskId, targetStateId) => {
     const payload = {
       taskId: parseInt(taskId),
@@ -43,14 +43,7 @@ const taskService = {
     };
     const response = await axiosClient.post('/task/status', payload);
     return response.data;
-  },
- update: async (taskId, taskData) => {
-    const response = await axiosClient.put('/task', {
-        id: taskId,       
-        ...taskData       
-    });
-    return response.data;
-  },
+  }
 };
 
 export default taskService;
