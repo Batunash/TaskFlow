@@ -5,6 +5,8 @@ import projectService from "../services/projectService";
 import taskService from "../services/taskService";
 import workflowService from "../services/workflowService";
 import organizationService from "../services/organizationService";
+import userService from "../services/userService";
+
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -233,16 +235,19 @@ export default function ProjectDetail() {
   };
 
   const openMemberModal = async () => {
-    setIsMemberModalOpen(true);
-    try {
-        if (project?.organizationId) {
-            const members = await organizationService.getMembers(project.organizationId);
-            setOrgMembers(members || []);
-        }
-    } catch (error) {
-        console.error("Failed to fetch org members:", error);
-    }
-  };
+  setIsMemberModalOpen(true);
+
+  try {
+    const me = await userService.getMe();
+    const orgId = me?.organizationId;
+    const members = await organizationService.getMembers(orgId);
+    setOrgMembers(members || []);
+  } catch (error) {
+    console.error("ORG MEMBER ERROR:", error);
+  }
+};
+
+
 
   const handleAddMember = async () => {
     if (!selectedMemberId) return;
