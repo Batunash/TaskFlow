@@ -9,7 +9,9 @@ namespace TaskFlow.Application.Validators
     {
         public InviteUserDtoValidator()
         {
-            RuleFor(x => x.UserId).GreaterThan(0).WithMessage("Geçerli bir Kullanıcı ID girilmelidir.");
+            RuleFor(x => x.UserName)
+                .NotEmpty().WithMessage("Username is required.")
+                .MinimumLength(3).WithMessage("Username must be at least 3 characters.");
         }
     }
 }

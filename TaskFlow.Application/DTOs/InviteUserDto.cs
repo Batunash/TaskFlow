@@ -6,6 +6,6 @@ namespace TaskFlow.Application.DTOs
 {
     public class InviteUserDto
     {
-        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
     }
 }

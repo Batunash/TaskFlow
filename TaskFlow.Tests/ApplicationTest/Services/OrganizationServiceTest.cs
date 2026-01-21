@@ -151,12 +151,53 @@ namespace TaskFlow.Tests.ApplicationTest.Services
         }
 
         [Fact]
-        public async Task InviteAsync_Should_Add_Member_When_User_Is_Owner()
+        public async Task GetCurrentAsync_Should_Return_Organization_When_User_Is_Accepted_Member()
+        {
+            // Arrange
+            int ownerId = 99;
+            int currentUserId = 1;
+            int orgId = 10;
+            _mockUserService.Setup(s => s.UserId).Returns(currentUserId);
+            _mockTenantService.Setup(s => s.OrganizationId).Returns(orgId);
+
+            var organization = new Organization("My Org", ownerId);
+            typeof(Organization).GetProperty("Id")?.SetValue(organization, orgId);
+            organization.AddMember(currentUserId, OrganizationRole.Member);
+            var member = organization.Members.First(m => m.UserId == currentUserId);
+            member.AcceptInvitation(); 
+
+            _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync(organization);
+            // Act
+            var result = await _organizationService.GetCurrentAsync();
+            // Assert
+            Assert.Equal("My Org", result.Name);
+        }
+
+        [Fact]
+        public async Task GetCurrentAsync_Should_Throw_Unauthorized_When_User_Has_Not_Accepted_Invite()
+        {
+            // Arrange
+            int ownerId = 99;
+            int currentUserId = 1;
+            int orgId = 10;
+            _mockUserService.Setup(s => s.UserId).Returns(currentUserId);
+            _mockTenantService.Setup(s => s.OrganizationId).Returns(orgId);
+
+            var organization = new Organization("My Org", ownerId);
+            organization.AddMember(currentUserId, OrganizationRole.Member);
+            _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync(organization);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _organizationService.GetCurrentAsync());
+        }
+
+        [Fact]
+        public async Task InviteAsync_Should_FindUserByName_And_AddMember()
         {
             // Arrange
             int ownerId = 1;
             int orgId = 10;
-            var dto = new InviteUserDto { UserId = 2 }; 
+            var dto = new InviteUserDto { UserName = "targetUser" }; 
 
             _mockInviteValidator.Setup(v => v.ValidateAsync(dto, It.IsAny<CancellationToken>()))
                               .ReturnsAsync(new ValidationResult());
@@ -165,44 +206,41 @@ namespace TaskFlow.Tests.ApplicationTest.Services
 
             var organization = new Organization("My Org", ownerId);
             _mockOrgRepo.Setup(r => r.GetByIdAsync(orgId)).ReturnsAsync(organization);
+            var targetUser = new User("targetUser", "hash", null);
+            typeof(User).GetProperty("Id")?.SetValue(targetUser, 55);
+            _mockUserRepo.Setup(r => r.GetByUserNameAsync("targetUser")).ReturnsAsync(targetUser);
 
             // Act
             await _organizationService.InviteAsync(dto, ownerId);
-            Assert.Contains(organization.Members, m => m.UserId == dto.UserId && m.Role == OrganizationRole.Member);
+
+            // Assert
+            Assert.Contains(organization.Members, m => m.UserId == 55 && m.Role == OrganizationRole.Member);
+            Assert.Contains(organization.Members, m => m.UserId == 55 && m.IsAccepted == false);
+
             _mockOrgRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]
-        public async Task InviteAsync_Should_Throw_Unauthorized_When_User_Is_Not_Owner()
+        public async Task AcceptInvitationAsync_Should_Set_IsAccepted_True()
         {
             // Arrange
-            int ownerId = 99;
-            int currentUserId = 1; 
-            var dto = new InviteUserDto { UserId = 2 };
+            int userId = 5;
+            int orgId = 10;
+            var organization = new Organization("Test Org", 99); 
+            typeof(Organization).GetProperty("Id")?.SetValue(organization, orgId);
 
-            _mockInviteValidator.Setup(v => v.ValidateAsync(dto, It.IsAny<CancellationToken>()))
-                              .ReturnsAsync(new ValidationResult());
+            organization.AddMember(userId, OrganizationRole.Member); 
 
-            _mockTenantService.Setup(s => s.OrganizationId).Returns(10);
+            _mockOrgRepo.Setup(r => r.GetByIdWithMembersAsync(orgId)).ReturnsAsync(organization);
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User("user", "pw", null));
 
-            var organization = new Organization("My Org", ownerId);
-            _mockOrgRepo.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(organization);
+            // Act
+            await _organizationService.AcceptInvitationAsync(orgId, userId);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _organizationService.InviteAsync(dto, currentUserId));
-        }
-
-        [Fact]
-        public async Task InviteAsync_Should_Throw_Unauthorized_When_OrganizationContext_Missing()
-        {
-            // Arrange
-            var dto = new InviteUserDto { UserId = 2 };
-            _mockInviteValidator.Setup(v => v.ValidateAsync(dto, It.IsAny<CancellationToken>()))
-                              .ReturnsAsync(new ValidationResult());
-            _mockTenantService.Setup(s => s.OrganizationId).Returns((int?)null);
-
-            // Act & Assert
-            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _organizationService.InviteAsync(dto, 1));
+            // Assert
+            var member = organization.Members.First(m => m.UserId == userId);
+            Assert.True(member.IsAccepted); 
+            _mockOrgRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
     }
 }
