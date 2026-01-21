@@ -7,7 +7,6 @@ import workflowService from "../services/workflowService";
 import organizationService from "../services/organizationService";
 import userService from "../services/userService";
 
-
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -16,11 +15,13 @@ export default function ProjectDetail() {
   const [tasks, setTasks] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]); 
   const [loading, setLoading] = useState(true);
+  
   const [filters, setFilters] = useState({
     keyword: "",
     assignedUserId: "",
     priority: "all"
   });
+
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: 1 });
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
@@ -33,9 +34,11 @@ export default function ProjectDetail() {
   const [selectedMemberId, setSelectedMemberId] = useState("");  
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: "", description: "" });
+
   useEffect(() => {
     fetchInitialData();
   }, [id]);
+
   useEffect(() => {
     if (!loading) {
       fetchTasks();
@@ -44,13 +47,17 @@ export default function ProjectDetail() {
 
   const fetchInitialData = async () => {
     try {
-      const [projectData, statesData] = await Promise.all([
+      const currentUser = await userService.getMe();
+      
+      const [projectData, statesData, orgMembersData] = await Promise.all([
         projectService.getById(id),
-        workflowService.getProjectStates(id)
+        workflowService.getProjectStates(id),
+        organizationService.getMembers(currentUser.organizationId)
       ]);
 
       setProject(projectData);
       setStates(statesData || []);
+      setOrgMembers(orgMembersData || []); 
       await fetchTasks();
       
     } catch (error) {
@@ -84,6 +91,7 @@ export default function ProjectDetail() {
       console.error("Failed to fetch tasks:", error);
     }
   };
+
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
       const matchesKeyword = filters.keyword === "" || 
@@ -95,6 +103,7 @@ export default function ProjectDetail() {
       return matchesKeyword && matchesPriority;
     });
   }, [tasks, filters.keyword, filters.priority]);
+
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
@@ -146,11 +155,13 @@ export default function ProjectDetail() {
     e.preventDefault();
     try {
       if (!editingTask) return;
+      
       await taskService.update(editingTask.id, {
         title: editingTask.title,
         description: editingTask.description,
         priority: parseInt(editingTask.priority)
       });
+
       const originalTask = tasks.find(t => t.id === editingTask.id);
       if (editingTask.assignedUserId && editingTask.assignedUserId != originalTask.assignedUserId) {
           await taskService.assign(editingTask.id, parseInt(editingTask.assignedUserId));
@@ -164,7 +175,7 @@ export default function ProjectDetail() {
       alert("Failed to update task.");
     }
   };
-
+  
   const handleStatusChange = async (taskId, newStateId) => {
       try {
           await taskService.changeStatus(taskId, newStateId);
@@ -235,19 +246,8 @@ export default function ProjectDetail() {
   };
 
   const openMemberModal = async () => {
-  setIsMemberModalOpen(true);
-
-  try {
-    const me = await userService.getMe();
-    const orgId = me?.organizationId;
-    const members = await organizationService.getMembers(orgId);
-    setOrgMembers(members || []);
-  } catch (error) {
-    console.error("ORG MEMBER ERROR:", error);
-  }
-};
-
-
+      setIsMemberModalOpen(true);
+  };
 
   const handleAddMember = async () => {
     if (!selectedMemberId) return;
@@ -312,7 +312,6 @@ export default function ProjectDetail() {
     }
   };
 
-
   if (loading) return <div className="text-white text-center mt-20">Loading...</div>;
 
   return (
@@ -359,6 +358,7 @@ export default function ProjectDetail() {
                 </button>
             </div>
         </div>
+        
         <div className="flex flex-wrap items-center gap-3 bg-[#1F2937] p-3 rounded-xl border border-gray-700">
             <div className="flex items-center gap-2 text-gray-400 mr-2">
                 <Filter size={16} />
@@ -374,16 +374,18 @@ export default function ProjectDetail() {
                     onChange={(e) => setFilters({...filters, keyword: e.target.value})}
                 />
             </div>
+
             <select 
                 className="bg-[#111827] border border-gray-600 rounded-lg py-1.5 px-3 text-sm text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
                 value={filters.assignedUserId}
                 onChange={(e) => setFilters({...filters, assignedUserId: e.target.value})}
             >
                 <option value="">All Assignees</option>
-                {project?.members?.map(m => (
-                    <option key={m.id} value={m.id}>{m.username}</option>
+                {orgMembers.map(m => (
+                    <option key={m.id} value={m.id}>{m.username || m.userName}</option>
                 ))}
             </select>
+            
             <select 
                 className="bg-[#111827] border border-gray-600 rounded-lg py-1.5 px-3 text-sm text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
                 value={filters.priority}
@@ -404,6 +406,7 @@ export default function ProjectDetail() {
             )}
         </div>
       </div>
+
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-6 h-full min-w-max pb-4 px-2">
           {states.map((state) => {
@@ -431,7 +434,7 @@ export default function ProjectDetail() {
                 
                 <div className="bg-[#1F2937]/50 rounded-xl p-3 flex-1 border border-gray-800/50 min-h-[200px] space-y-3">
                     {columnTasks.map(task => {
-                        const assignedMember = project?.members?.find(m => m.id === task.assignedUserId);
+                        const assignedMember = orgMembers.find(m => m.id === task.assignedUserId);
                         return (
                             <div key={task.id} className="bg-[#1F2937] p-4 rounded-lg border border-gray-700 hover:border-blue-500/50 shadow-sm group relative">
                             <div className="flex justify-between items-start mb-2">
@@ -454,7 +457,7 @@ export default function ProjectDetail() {
                             {assignedMember && (
                                 <div className="mb-2">
                                     <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
-                                    👤 {assignedMember.username || "Assigned"}
+                                    👤 {assignedMember.username || assignedMember.userName || "Assigned"}
                                     </span>
                                 </div>
                             )}
@@ -472,7 +475,6 @@ export default function ProjectDetail() {
                             </div>
                         );
                     })}
-                    
                     {columnTasks.length === 0 && (
                         <div className="h-full flex items-center justify-center opacity-30">
                             <div className="text-center">
@@ -484,7 +486,6 @@ export default function ProjectDetail() {
                 </div>
             );
           })}
-
           {states.length === 0 && (
             <div className="text-gray-500 m-auto text-center">
               <p>This project has no workflow yet.</p>
@@ -493,41 +494,43 @@ export default function ProjectDetail() {
           )}
         </div>
       </div>
+
       {isMemberModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl p-6 relative">
-            <button onClick={() => setIsMemberModalOpen(false)} className="absolute right-4 top-4 text-gray-400 hover:text-white">
-                <X size={20} />
-            </button>
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <Users size={20} className="text-blue-400"/> Project Members
-            </h3>
-            
-            <div className="mb-6">
+           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl p-6 relative">
+             <button onClick={() => setIsMemberModalOpen(false)} className="absolute right-4 top-4 text-gray-400 hover:text-white">
+                 <X size={20} />
+             </button>
+             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                 <Users size={20} className="text-blue-400"/> Project Members
+             </h3>
+             
+              <div className="mb-6">
                 <h4 className="text-sm text-gray-400 mb-3 uppercase font-semibold">Current Team</h4>
                 <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                     {project?.members?.map(member => (
-                        <div key={member.id} className="flex justify-between items-center bg-[#111827] p-3 rounded-lg border border-gray-700">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center text-blue-200 text-xs font-bold border border-blue-500/30">
-                                    {member.username?.[0]?.toUpperCase() || "U"}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-200">{member.username}</p>
-                                    <p className="text-xs text-gray-500">{member.email}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => handleRemoveMember(member.id)} className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors">
-                                <X size={16} />
-                            </button>
-                        </div>
+                       <div key={member.id} className="flex justify-between items-center bg-[#111827] p-3 rounded-lg border border-gray-700">
+                           <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center text-blue-200 text-xs font-bold border border-blue-500/30">
+                                   {(member.userName || member.username)?.[0]?.toUpperCase() || "U"}
+                               </div>
+                               <div>
+                                   <p className="text-sm font-medium text-gray-200">{member.userName || member.username}</p>
+                                   <p className="text-xs text-gray-500">{member.email}</p>
+                               </div>
+                           </div>
+                           <button onClick={() => handleRemoveMember(member.id)} className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors">
+                               <X size={16} />
+                           </button>
+                       </div>
                     ))}
                     {(!project?.members || project.members.length === 0) && (
-                        <p className="text-gray-500 text-sm italic">No members yet.</p>
+                        <p className="text-gray-500 text-sm italic">
+                            No members found.
+                        </p>
                     )}
                 </div>
             </div>
-
             <div className="pt-6 border-t border-gray-700">
                 <h4 className="text-sm text-gray-400 mb-3 uppercase font-semibold">Add New Member</h4>
                 <div className="flex gap-2">
@@ -540,7 +543,7 @@ export default function ProjectDetail() {
                         {orgMembers
                             .filter(orgMember => !project?.members?.some(pm => pm.id === orgMember.id))
                             .map(m => (
-                                <option key={m.id} value={m.id}>{m.username} ({m.email})</option>
+                                <option key={m.id} value={m.id}>{m.username || m.userName}</option>
                         ))}
                     </select>
                     <button 
@@ -552,9 +555,10 @@ export default function ProjectDetail() {
                     </button>
                 </div>
             </div>
-          </div>
+           </div>
         </div>
       )}
+
       {isStateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
@@ -595,6 +599,7 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
+
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
@@ -627,6 +632,7 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
+
       {isEditModalOpen && editingTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
@@ -645,6 +651,7 @@ export default function ProjectDetail() {
                 <textarea className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 h-24 resize-none"
                   value={editingTask.description} onChange={(e) => setEditingTask({...editingTask, description: e.target.value})} />
               </div>
+              
               <div className="flex gap-4">
                   <div className="flex-1">
                     <label className="block text-sm text-gray-400 mb-1">Priority</label>
@@ -655,18 +662,19 @@ export default function ProjectDetail() {
                       <option value="2">High</option>
                     </select>
                   </div>
+
                   <div className="flex-1">
                     <label className="block text-sm text-gray-400 mb-1">Assign To</label>
                     <select className="w-full bg-[#111827] border border-gray-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
                       value={editingTask.assignedUserId} onChange={(e) => setEditingTask({...editingTask, assignedUserId: e.target.value})}>
                       <option value="">-- Unassigned --</option>
-                      {project?.members?.map(member => (
-                        <option key={member.id} value={member.id}>{member.username || `User ${member.id}`}</option>
+                      {orgMembers.map(member => (
+                        <option key={member.id} value={member.id}>{member.username || member.userName || `User ${member.id}`}</option>
                       ))}
                     </select>
                   </div>
               </div>
-              <div className="flex gap-3 mt-6">
+               <div className="flex gap-3 mt-6">
                   <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium">Cancel</button>
                   <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">Save Changes</button>
               </div>
@@ -674,6 +682,7 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
+
       {isProjectSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1F2937] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl p-6 relative">
