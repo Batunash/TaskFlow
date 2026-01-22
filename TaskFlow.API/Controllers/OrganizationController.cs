@@ -49,7 +49,12 @@ namespace TaskFlow.API.Controllers
         {
             var userId = currentUserService.UserId!.Value;
             await organizationService.AcceptInvitationAsync(organizationId, currentUserService.UserId!.Value);
-            return Ok(new { message = "Invitation accepted. You are now a member." });
+            var newToken = jwtTokenGenerator.Generate(
+                userId,
+                organizationId,
+                OrganizationRole.Member.ToString()
+            );
+            return Ok(new { message = "Invitation accepted. You are now a member." ,accessToken = newToken});
         }
         [HttpGet("invitations")]
         public async Task<IActionResult> GetMyInvitations()

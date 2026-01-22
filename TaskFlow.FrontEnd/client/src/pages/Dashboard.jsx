@@ -87,17 +87,21 @@ export default function Dashboard() {
     }
   };
 
-  const handleAcceptInvite = async (orgId) => {
-    if(!window.confirm("Do you want to join this organization?")) return;
-    setAcceptingInvite(true);
-    try {
-        await organizationService.acceptInvitation(orgId);
-        handleLogout(); 
-    } catch (error) {
-        alert(error.response?.data?.message || "Failed to accept invitation.");
-        setAcceptingInvite(false);
-    }
-  };
+ const handleAcceptInvite = async (orgId) => {
+  if(!window.confirm("Do you want to join this organization?")) return;
+  setAcceptingInvite(true);
+  try {
+      const data = await organizationService.acceptInvitation(orgId);
+      
+      if (data.accessToken) {
+          localStorage.setItem("token", data.accessToken);
+          window.location.href = "/dashboard"; 
+      }
+  } catch (error) {
+      alert(error.response?.data?.message || "Failed to accept invitation.");
+      setAcceptingInvite(false);
+  }
+};
 
   const handleLogout = () => {
     localStorage.removeItem("token");
